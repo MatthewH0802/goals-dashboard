@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#000000">
+  <title>M&M Goals</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Login screen -->
+  <div id="login-screen" class="screen active">
+    <div class="login-box">
+      <h1>M&M</h1>
+      <p class="login-sub">Goals Dashboard</p>
+      <button class="who-btn" data-user="matthew">I'm Matthew</button>
+      <button class="who-btn" data-user="marie">I'm Marie</button>
+    </div>
+  </div>
+
+  <!-- Main app -->
+  <div id="app-screen" class="screen">
+    <header class="app-header">
+      <div class="header-left">
+        <span id="current-user" class="user-pill"></span>
+        <span id="day-counter" class="day-pill">Day 1</span>
+      </div>
+      <button id="switch-user" class="switch-btn">switch</button>
+    </header>
+
+    <div id="visit-banner" class="visit-banner hidden"></div>
+
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="today">Today</button>
+      <button class="tab-btn" data-tab="habits">Week</button>
+      <button class="tab-btn" data-tab="outcomes">Goals</button>
+      <button class="tab-btn" data-tab="standards">Us</button>
+      <button class="tab-btn" data-tab="checkin">Check-in</button>
+    </nav>
+
+    <!-- Today tab: big quick-log buttons -->
+    <section id="tab-today" class="tab-pane active">
+      <h2 class="section-title">Tap to log <span id="today-date" class="date-sub"></span></h2>
+      <div id="today-habits" class="quick-log-grid"></div>
+
+      <div class="section-divider"></div>
+      <h2 class="section-title">Your top focus</h2>
+      <div id="today-focus"></div>
+    </section>
+
+    <!-- Habits week view -->
+    <section id="tab-habits" class="tab-pane">
+      <div class="person-toggle">
+        <button class="person-btn active" data-person="matthew">Matthew</button>
+        <button class="person-btn" data-person="marie">Marie</button>
+        <button class="person-btn" data-person="shared">Shared</button>
+      </div>
+      <div id="habits-week-grid"></div>
+    </section>
+
+    <!-- Outcomes -->
+    <section id="tab-outcomes" class="tab-pane">
+      <div class="person-toggle">
+        <button class="person-btn active" data-person="matthew">Matthew</button>
+        <button class="person-btn" data-person="marie">Marie</button>
+        <button class="person-btn" data-person="shared">Shared</button>
+      </div>
+      <div id="outcomes-list"></div>
+    </section>
+
+    <!-- Standards -->
+    <section id="tab-standards" class="tab-pane">
+      <p class="muted">Rate each other 1-5 during Sunday check-ins.</p>
+      <h3 class="sub-title">Matthew rates Marie</h3>
+      <div id="standards-marie"></div>
+      <h3 class="sub-title">Marie rates Matthew</h3>
+      <div id="standards-matthew"></div>
+    </section>
+
+    <!-- Check-in -->
+    <section id="tab-checkin" class="tab-pane">
+      <p class="muted">Sundays · 1pm PST / 4pm EST · ~30 min</p>
+      <div class="question-card">
+        <div class="q-label">Discussion question</div>
+        <p id="discussion-q"></p>
+        <button id="new-q" class="text-btn">New question ↻</button>
+      </div>
+      <div class="checkin-step">
+        <h3>1 · Gratitude</h3>
+        <p class="muted">What did the other do this week you want repeated?</p>
+        <textarea id="ci-gratitude" placeholder="Write together..."></textarea>
+      </div>
+      <div class="checkin-step">
+        <h3>2 · State of the union</h3>
+        <p class="muted">Anything we missed addressing this week?</p>
+        <textarea id="ci-issues"></textarea>
+      </div>
+      <div class="checkin-step">
+        <h3>3 · Standards check</h3>
+        <p class="muted">Switch to Us tab and rate each other.</p>
+      </div>
+      <div class="checkin-step">
+        <h3>4 · Goals review</h3>
+        <p class="muted">How did we do on what we said we'd do?</p>
+        <textarea id="ci-goals"></textarea>
+      </div>
+      <div class="checkin-step">
+        <h3>5 · Looking ahead</h3>
+        <p class="muted">Next visit? Date night? What's coming?</p>
+        <textarea id="ci-ahead"></textarea>
+      </div>
+      <button id="save-checkin" class="primary-btn">Save check-in</button>
+      <details>
+        <summary>Past check-ins</summary>
+        <div id="checkin-archive"></div>
+      </details>
+    </section>
+
+    <div id="sync-indicator" class="sync-pill">synced</div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
