@@ -62,9 +62,11 @@ body {
   text-align: center;
 }
 .login-box h1 {
-  font-size: 64px;
-  font-weight: 200;
-  letter-spacing: -2px;
+  font-family: "Fraunces", Georgia, serif;
+  font-optical-sizing: auto;
+  font-size: 72px;
+  font-weight: 300;
+  letter-spacing: -3px;
   margin-bottom: 4px;
 }
 .login-sub {
@@ -131,10 +133,53 @@ body {
 .visit-banner {
   background: var(--visit-bg);
   color: var(--visit-text);
-  padding: 10px 16px;
-  margin: 12px;
-  border-radius: 10px;
+  padding: 28px 24px;
+  margin: 16px 12px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--visit-text) 25%, transparent);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 2px;
+}
+.visit-banner .visit-heart {
+  font-size: 14px;
+  opacity: 0.7;
+  margin-bottom: 6px;
+}
+.visit-banner .visit-count {
+  font-family: "Fraunces", Georgia, serif;
+  font-optical-sizing: auto;
+  font-size: 64px;
+  font-weight: 300;
+  letter-spacing: -2px;
+  line-height: 1;
+  display: block;
+}
+.visit-banner .visit-label {
+  display: block;
   font-size: 13px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-top: 8px;
+  opacity: 0.85;
+}
+.visit-banner .visit-dates {
+  display: block;
+  font-size: 12px;
+  margin-top: 4px;
+  opacity: 0.6;
+  letter-spacing: 0.5px;
+}
+.visit-banner .visit-headline {
+  font-family: "Fraunces", Georgia, serif;
+  font-optical-sizing: auto;
+  font-size: 28px;
+  font-weight: 300;
+  letter-spacing: -0.5px;
+  line-height: 1.1;
+  display: block;
 }
 
 .tabs {
@@ -165,10 +210,12 @@ body {
 .tab-pane.active { display: block; }
 
 .section-title {
+  font-family: "Fraunces", Georgia, serif;
+  font-optical-sizing: auto;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 1.5px;
   color: var(--text-muted);
   margin-bottom: 16px;
 }
@@ -185,11 +232,28 @@ body {
   margin: 2rem 0;
 }
 .sub-title {
-  font-size: 14px;
-  font-weight: 600;
+  font-family: "Fraunces", Georgia, serif;
+  font-optical-sizing: auto;
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: -0.2px;
   margin: 1.5rem 0 0.75rem;
 }
 .muted { color: var(--text-muted); font-size: 13px; margin-bottom: 1rem; }
+
+/* Habit sections */
+.habit-section { margin-bottom: 1.5rem; }
+.habit-section-title {
+  font-family: "Fraunces", Georgia, serif;
+  font-optical-sizing: auto;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--text-faint);
+  margin-bottom: 10px;
+  padding-left: 2px;
+}
 
 /* Quick log buttons */
 .quick-log-grid {
@@ -198,11 +262,11 @@ body {
   gap: 10px;
 }
 .quick-log-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  padding: 18px 16px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto 1fr auto;
+  gap: 2px;
+  padding: 14px 14px 12px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--bg-elevated);
@@ -210,35 +274,62 @@ body {
   cursor: pointer;
   font-family: inherit;
   text-align: left;
-  transition: all 0.15s ease;
-  min-height: 80px;
+  transition: transform 120ms ease, background 150ms ease, border-color 150ms ease;
+  min-height: 88px;
   position: relative;
 }
 .quick-log-btn:active { transform: scale(0.97); }
 .quick-log-btn.done {
-  background: var(--done);
-  color: var(--bg);
-  border-color: var(--done);
+  background: var(--bg-elevated);
+  color: var(--text);
+  border-color: var(--text);
+}
+.quick-log-btn.done .qlog-emoji { opacity: 0.4; }
+.quick-log-btn .qlog-emoji {
+  grid-column: 1;
+  grid-row: 1;
+  font-size: 22px;
+  line-height: 1;
+}
+.quick-log-btn .qlog-check {
+  display: none;
+  grid-column: 1;
+  grid-row: 1;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--text);
+  font-weight: 600;
+  margin-left: 28px;
+  align-self: center;
+}
+.quick-log-btn.done .qlog-check { display: inline; }
+.quick-log-btn .qlog-streak {
+  grid-column: 2;
+  grid-row: 1;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  align-self: start;
+  justify-self: end;
 }
 .quick-log-btn .qlog-name {
-  font-size: 15px;
-  font-weight: 600;
+  grid-column: 1 / -1;
+  grid-row: 2;
+  align-self: end;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.2;
+  margin-top: 10px;
 }
 .quick-log-btn .qlog-meta {
+  grid-column: 1 / -1;
+  grid-row: 3;
   font-size: 11px;
-  opacity: 0.7;
+  color: var(--text-muted);
+  opacity: 0.85;
+  margin-top: 2px;
 }
-.quick-log-btn .qlog-streak {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  font-size: 11px;
-  font-weight: 600;
-}
-.quick-log-btn .qlog-emoji {
-  font-size: 20px;
-  margin-bottom: 4px;
-}
+.quick-log-btn.done .qlog-meta { color: var(--text-muted); }
 
 /* Focus cards */
 .focus-card {
@@ -529,3 +620,38 @@ summary {
   opacity: 0.7;
 }
 .sync-pill.syncing { color: var(--text); }
+
+/* Partner presence dot */
+.partner-presence {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.partner-presence::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  background: #2ecc71;
+  border-radius: 50%;
+  animation: presence-pulse 2s ease-in-out infinite;
+}
+.partner-presence.hidden { display: none; }
+@keyframes presence-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.4); }
+}
+
+/* Today hero line */
+.hero-line {
+  padding: 4px 2px 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-family: "Fraunces", Georgia, serif;
+  font-optical-sizing: auto;
+  letter-spacing: 0.02em;
+}
+.hero-line.empty { display: none; }
+.hero-line strong { font-weight: 500; color: var(--text); }

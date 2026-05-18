@@ -211,6 +211,36 @@ function showApp() {
   currentOutcomeView = currentUser;
   currentHabitView = currentUser;
   renderAll();
+  startPresence();
+}
+
+let _presenceHeartbeat = null;
+let _presenceUnsub = null;
+function startPresence() {
+  if (!currentUser) return;
+  // Clean up any prior listener (e.g. on user switch)
+  if (_presenceHeartbeat) clearInterval(_presenceHeartbeat);
+  if (typeof _presenceUnsub === "function") { try { _presenceUnsub(); } catch(e){} }
+
+  const presenceRef = doc(db, "presence", currentUser);
+  const ping = () => setDoc(presenceRef, { lastActive: Date.now(), user: currentUser }, { merge: true });
+  ping();
+  _presenceHeartbeat = setInterval(ping, 30000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) ping(); });
+  window.addEventListener("beforeunload", () => {
+    try { setDoc(presenceRef, { lastActive: 0 }, { merge: true }); } catch(e) {}
+  });
+
+  const partner = currentUser === "matthew" ? "marie" : "matthew";
+  const partnerRef = doc(db, "presence", partner);
+  _presenceUnsub = onSnapshot(partnerRef, (snap) => {
+    const data = snap.data();
+    const online = data && data.lastActive && (Date.now() - data.lastActive < 60000);
+    const el = document.getElementById("partner-presence");
+    if (!el) return;
+    el.classList.toggle("hidden", !online);
+    el.textContent = partner.charAt(0).toUpperCase() + partner.slice(1);
+  });
 }
 
 function renderAll() {
@@ -231,14 +261,46 @@ function renderHeader() {
   const banner = document.getElementById("visit-banner");
   if (today >= VISIT_START && today <= VISIT_END) {
     banner.classList.remove("hidden");
-    banner.innerHTML = "❤ <strong>Marie is here!</strong> Book next trip before she leaves.";
+    banner.innerHTML = `<span class="visit-heart">❤</span>
+      <span class="visit-headline">Marie is here</span>
+      <span class="visit-label">Book the next trip before she leaves</span>
+      <span class="visit-dates">May 25 – 29</span>`;
   } else if (today < VISIT_START) {
     const d = daysBetween(today, VISIT_START);
     banner.classList.remove("hidden");
-    banner.innerHTML = `❤ Marie arrives in <strong>${d} day${d === 1 ? "" : "s"}</strong> (May 25–29)`;
+    banner.innerHTML = `<span class="visit-heart">❤</span>
+      <span class="visit-count">${d}</span>
+      <span class="visit-label">${d === 1 ? "day" : "days"} until Marie</span>
+      <span class="visit-dates">May 25 – 29</span>`;
   } else {
     banner.classList.add("hidden");
   }
+}
+
+const HABIT_SECTIONS = {
+  body: { title: "Body", ids: ["mw-gym","mw-run","mw-vitamins","mw-water","mw-bedtime","mw-wake6","mw-screen","mr-gym","mr-wake","mr-vitamins","mr-water","mr-sweets","mr-screen"] },
+  mind: { title: "Mind & Spirit", ids: ["mw-chess","mw-agpeya","mr-agpeya","mr-ig-inf","sh-reading","sh-communion","sh-confession"] },
+  together: { title: "Together", ids: ["sh-prayer","sh-checkin","sh-datenight","sh-watch"] }
+};
+
+function sectionFor(id) {
+  if (HABIT_SECTIONS.body.ids.includes(id)) return "body";
+  if (HABIT_SECTIONS.mind.ids.includes(id)) return "mind";
+  if (HABIT_SECTIONS.together.ids.includes(id)) return "together";
+  return "body";
+}
+
+function habitCardHtml(h, today, locked) {
+  const k = today + "_" + h.id;
+  const done = state.habitLog[k] === "done";
+  const streak = getStreak(h.id);
+  return `<button class="quick-log-btn ${done ? "done" : ""}" data-habit="${h.id}" ${locked ? "disabled" : ""}>
+    <span class="qlog-emoji">${h.emoji}</span>
+    <span class="qlog-check">✓</span>
+    ${streak > 0 ? `<span class="qlog-streak">${streak} day${streak === 1 ? "" : "s"}</span>` : ""}
+    <span class="qlog-name">${h.name}</span>
+    <span class="qlog-meta">${h.target}</span>
+  </button>`;
 }
 
 function renderToday() {
@@ -250,17 +312,39 @@ function renderToday() {
   const allMine = [...myHabits, ...sharedHabits];
   const locked = today < START_DATE;
 
-  document.getElementById("today-habits").innerHTML = allMine.map(h => {
-    const k = today + "_" + h.id;
-    const done = state.habitLog[k] === "done";
-    const streak = getStreak(h.id);
-    return `<button class="quick-log-btn ${done ? "done" : ""}" data-habit="${h.id}" ${locked ? "disabled" : ""}>
-      ${streak > 0 ? `<span class="qlog-streak">${streak}🔥</span>` : ""}
-      <span class="qlog-emoji">${h.emoji}</span>
-      <span class="qlog-name">${h.name}</span>
-      <span class="qlog-meta">${h.target}</span>
-    </button>`;
-  }).join("");
+  // Group by section
+  const groups = { body: [], mind: [], together: [] };
+  allMine.forEach(h => groups[sectionFor(h.id)].push(h));
+
+  let html = "";
+  Object.keys(HABIT_SECTIONS).forEach(key => {
+    const list = groups[key];
+    if (!list.length) return;
+    html += `<div class="habit-section">
+      <h3 class="habit-section-title">${HABIT_SECTIONS[key].title}</h3>
+      <div class="quick-log-grid">${list.map(h => habitCardHtml(h, today, locked)).join("")}</div>
+    </div>`;
+  });
+  document.getElementById("today-habits").innerHTML = html;
+
+  // Hero line: You: done/total today
+  const myDone = allMine.filter(h => state.habitLog[today + "_" + h.id] === "done").length;
+  const myTotal = allMine.length;
+  const partner = currentUser === "matthew" ? "marie" : "matthew";
+  const partnerHabits = [...(HABITS[partner] || []), ...sharedHabits];
+  const partnerDone = partnerHabits.filter(h => state.habitLog[today + "_" + h.id] === "done").length;
+  const partnerTotal = partnerHabits.length;
+  const partnerName = partner.charAt(0).toUpperCase() + partner.slice(1);
+  const hero = document.getElementById("hero-line");
+  if (hero) {
+    if (locked) {
+      hero.classList.add("empty");
+      hero.innerHTML = "";
+    } else {
+      hero.classList.remove("empty");
+      hero.innerHTML = `<strong>You: ${myDone}/${myTotal}</strong> &middot; ${partnerName}: ${partnerDone}/${partnerTotal}`;
+    }
+  }
 
   document.querySelectorAll(".quick-log-btn").forEach(btn => {
     btn.addEventListener("click", () => {
