@@ -1,7 +1,7 @@
 // M&M Goals Dashboard - Firebase-synced app
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import {
-  getFirestore, doc, setDoc, onSnapshot, getDoc
+  getFirestore, doc, setDoc, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -17,7 +17,6 @@ const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 const DOC_REF = doc(db, "dashboard", "main");
 
-// ============ CONFIG ============
 const START_DATE = "2026-05-18";
 const VISIT_START = "2026-05-25";
 const VISIT_END = "2026-05-29";
@@ -114,7 +113,6 @@ const QUESTIONS = [
   "What's something hard you'd want my support with?"
 ];
 
-// ============ STATE ============
 let state = {
   outcomeProgress: {},
   habitLog: {},
@@ -127,44 +125,13 @@ let state = {
 let currentUser = localStorage.getItem("mm-user") || null;
 let currentOutcomeView = "matthew";
 let currentHabitView = "matthew";
-let unsubscribe = null;
 let writeTimer = null;
 
-// ============ FIREBASE SYNC ============
-async function subscribeToData() {
-  unsubscribe = onSnapshot(DOC_REF, (snap) => {
-    if (snap.exists()) {
-      state = Object.assign(state, snap.data());
-      renderAll();
-      setSyncStatus("synced");
-    }
-  }, (err) => {
-    console.error("Sync error:", err);
-    setSyncStatus("offline");
-  });
+function ready(fn) {
+  if (document.readyState !== "loading") fn();
+  else document.addEventListener("DOMContentLoaded", fn);
 }
 
-function pushToFirebase() {
-  setSyncStatus("syncing");
-  clearTimeout(writeTimer);
-  writeTimer = setTimeout(async () => {
-    try {
-      await setDoc(DOC_REF, state);
-      setSyncStatus("synced");
-    } catch (e) {
-      setSyncStatus("offline");
-      console.error("Save failed:", e);
-    }
-  }, 400);
-}
-
-function setSyncStatus(status) {
-  const el = document.getElementById("sync-indicator");
-  el.textContent = status;
-  el.classList.toggle("syncing", status === "syncing");
-}
-
-// ============ HELPERS ============
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 function isoDate(d) { return d.toISOString().slice(0, 10); }
 function daysBetween(a, b) {
@@ -198,11 +165,45 @@ function getStreak(habitId) {
   return streak;
 }
 
-// ============ LOGIN ============
+function setSyncStatus(status) {
+  const el = document.getElementById("sync-indicator");
+  if (!el) return;
+  el.textContent = status;
+  el.classList.toggle("syncing", status === "syncing");
+}
+
+function pushToFirebase() {
+  setSyncStatus("syncing");
+  clearTimeout(writeTimer);
+  writeTimer = setTimeout(async () => {
+    try {
+      await setDoc(DOC_REF, state);
+      setSyncStatus("synced");
+    } catch (e) {
+      setSyncStatus("offline");
+      console.error("Save failed:", e);
+    }
+  }, 400);
+}
+
+function subscribeToData() {
+  onSnapshot(DOC_REF, (snap) => {
+    if (snap.exists()) {
+      state = Object.assign(state, snap.data());
+      if (currentUser) renderAll();
+      setSyncStatus("synced");
+    }
+  }, (err) => {
+    console.error("Sync error:", err);
+    setSyncStatus("offline");
+  });
+}
+
 function showLogin() {
   document.getElementById("login-screen").classList.add("active");
   document.getElementById("app-screen").classList.remove("active");
 }
+
 function showApp() {
   document.getElementById("login-screen").classList.remove("active");
   document.getElementById("app-screen").classList.add("active");
@@ -212,31 +213,6 @@ function showApp() {
   renderAll();
 }
 
-document.querySelectorAll(".who-btn").forEach(btn => {
-  btn.addEventListener("click", () => {
-    currentUser = btn.dataset.user;
-    localStorage.setItem("mm-user", currentUser);
-    showApp();
-  });
-});
-
-document.getElementById("switch-user").addEventListener("click", () => {
-  currentUser = null;
-  localStorage.removeItem("mm-user");
-  showLogin();
-});
-
-// ============ TABS ============
-document.querySelectorAll(".tab-btn").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b === btn));
-    document.querySelectorAll(".tab-pane").forEach(p =>
-      p.classList.toggle("active", p.id === "tab-" + btn.dataset.tab)
-    );
-  });
-});
-
-// ============ RENDER ============
 function renderAll() {
   renderHeader();
   renderToday();
@@ -249,11 +225,9 @@ function renderAll() {
 function renderHeader() {
   const today = todayISO();
   const dayEl = document.getElementById("day-counter");
-  if (today < START_DATE) {
-    dayEl.textContent = "starts May 18";
-  } else {
-    dayEl.textContent = "Day " + (daysBetween(START_DATE, today) + 1);
-  }
+  if (today < START_DATE) dayEl.textContent = "starts May 18";
+  else dayEl.textContent = "Day " + (daysBetween(START_DATE, today) + 1);
+
   const banner = document.getElementById("visit-banner");
   if (today >= VISIT_START && today <= VISIT_END) {
     banner.classList.remove("hidden");
@@ -278,8 +252,7 @@ function renderToday() {
 
   document.getElementById("today-habits").innerHTML = allMine.map(h => {
     const k = today + "_" + h.id;
-    const status = state.habitLog[k];
-    const done = status === "done";
+    const done = state.habitLog[k] === "done";
     const streak = getStreak(h.id);
     return `<button class="quick-log-btn ${done ? "done" : ""}" data-habit="${h.id}" ${locked ? "disabled" : ""}>
       ${streak > 0 ? `<span class="qlog-streak">${streak}🔥</span>` : ""}
@@ -301,7 +274,6 @@ function renderToday() {
     });
   });
 
-  // Focus outcomes
   const allOutcomes = [...OUTCOMES.matthew, ...OUTCOMES.marie, ...OUTCOMES.shared];
   const myFocus = allOutcomes.filter(o => o.focus && (OUTCOMES[currentUser].includes(o) || OUTCOMES.shared.includes(o)));
   document.getElementById("today-focus").innerHTML = myFocus.map(o => {
@@ -402,7 +374,7 @@ function renderOutcomes() {
 }
 
 function renderStandards() {
-  const render = (containerId, list) => {
+  const renderSec = (containerId, list) => {
     document.getElementById(containerId).innerHTML = list.map(s => {
       const k = "std_" + s.id;
       const log = state.standardsLog[k] || [];
@@ -416,8 +388,8 @@ function renderStandards() {
       </div>`;
     }).join("");
   };
-  render("standards-marie", STANDARDS_MARIE);
-  render("standards-matthew", STANDARDS_MATTHEW);
+  renderSec("standards-marie", STANDARDS_MARIE);
+  renderSec("standards-matthew", STANDARDS_MATTHEW);
 
   document.querySelectorAll(".rating-btn").forEach(b => {
     b.addEventListener("click", () => {
@@ -437,7 +409,8 @@ function renderStandards() {
 function renderCheckin() {
   document.getElementById("discussion-q").textContent = QUESTIONS[state.qIndex % QUESTIONS.length];
   ["gratitude", "issues", "goals", "ahead"].forEach(f => {
-    document.getElementById("ci-" + f).value = state.currentCheckin[f] || "";
+    const el = document.getElementById("ci-" + f);
+    if (el) el.value = state.currentCheckin[f] || "";
   });
   document.getElementById("checkin-archive").innerHTML = state.checkinArchive.slice(-10).reverse().map(c =>
     `<div class="archive-item"><div class="date">${c.date}</div>
@@ -449,37 +422,69 @@ function renderCheckin() {
   ).join("") || "<p class='muted'>No past check-ins yet.</p>";
 }
 
-["gratitude", "issues", "goals", "ahead"].forEach(f => {
-  document.getElementById("ci-" + f).addEventListener("input", e => {
-    state.currentCheckin[f] = e.target.value;
-    pushToFirebase();
+ready(() => {
+  console.log("M&M app initializing");
+
+  document.querySelectorAll(".who-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      currentUser = btn.dataset.user;
+      localStorage.setItem("mm-user", currentUser);
+      showApp();
+    });
   });
-});
 
-document.getElementById("new-q").addEventListener("click", () => {
-  state.qIndex++;
-  pushToFirebase();
-  renderCheckin();
-});
+  const switchBtn = document.getElementById("switch-user");
+  if (switchBtn) {
+    switchBtn.addEventListener("click", () => {
+      currentUser = null;
+      localStorage.removeItem("mm-user");
+      showLogin();
+    });
+  }
 
-document.getElementById("save-checkin").addEventListener("click", () => {
-  const entry = {
-    date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-    q: QUESTIONS[state.qIndex % QUESTIONS.length],
-    ...state.currentCheckin
-  };
-  state.checkinArchive.push(entry);
-  state.currentCheckin = { gratitude: "", issues: "", goals: "", ahead: "" };
-  state.qIndex++;
-  pushToFirebase();
-  renderCheckin();
-  alert("Saved!");
-});
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b === btn));
+      document.querySelectorAll(".tab-pane").forEach(p =>
+        p.classList.toggle("active", p.id === "tab-" + btn.dataset.tab)
+      );
+    });
+  });
 
-// ============ INIT ============
-if (currentUser) {
-  showApp();
-} else {
-  showLogin();
-}
-subscribeToData();
+  ["gratitude", "issues", "goals", "ahead"].forEach(f => {
+    const el = document.getElementById("ci-" + f);
+    if (el) {
+      el.addEventListener("input", e => {
+        state.currentCheckin[f] = e.target.value;
+        pushToFirebase();
+      });
+    }
+  });
+
+  const newQBtn = document.getElementById("new-q");
+  if (newQBtn) newQBtn.addEventListener("click", () => {
+    state.qIndex++;
+    pushToFirebase();
+    renderCheckin();
+  });
+
+  const saveBtn = document.getElementById("save-checkin");
+  if (saveBtn) saveBtn.addEventListener("click", () => {
+    const entry = {
+      date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      q: QUESTIONS[state.qIndex % QUESTIONS.length],
+      ...state.currentCheckin
+    };
+    state.checkinArchive.push(entry);
+    state.currentCheckin = { gratitude: "", issues: "", goals: "", ahead: "" };
+    state.qIndex++;
+    pushToFirebase();
+    renderCheckin();
+    alert("Saved!");
+  });
+
+  if (currentUser) showApp();
+  else showLogin();
+
+  subscribeToData();
+});
