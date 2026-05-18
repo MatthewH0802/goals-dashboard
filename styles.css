@@ -51,7 +51,6 @@ body {
 
 /* Login */
 #login-screen {
-  display: flex;
   align-items: center;
   justify-content: center;
   padding: 2rem;
