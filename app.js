@@ -132,8 +132,9 @@ function ready(fn) {
   else document.addEventListener("DOMContentLoaded", fn);
 }
 
-function todayISO() { return new Date().toISOString().slice(0, 10); }
-function isoDate(d) { return d.toISOString().slice(0, 10); }
+function pad2(n){return String(n).padStart(2,"0");}
+function todayISO() { const d=new Date(); return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()); }
+function isoDate(d) { return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()); }
 function daysBetween(a, b) {
   return Math.floor((new Date(b + "T00:00:00") - new Date(a + "T00:00:00")) / 86400000);
 }
