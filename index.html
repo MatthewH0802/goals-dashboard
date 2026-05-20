@@ -13,7 +13,7 @@
   <link rel="icon" type="image/png" sizes="512x512" href="apple-touch-icon-512.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,300;1,9..144,400&display=swap">
 </head>
 <body>
   <!-- Login screen -->
@@ -41,9 +41,10 @@
 
     <nav class="tabs">
       <button class="tab-btn active" data-tab="today">Today</button>
+      <button class="tab-btn" data-tab="us">Us</button>
       <button class="tab-btn" data-tab="habits">Week</button>
       <button class="tab-btn" data-tab="outcomes">Goals</button>
-      <button class="tab-btn" data-tab="standards">Us</button>
+      <button class="tab-btn" data-tab="standards">Standards</button>
       <button class="tab-btn" data-tab="checkin">Check-in</button>
     </nav>
 
@@ -56,6 +57,67 @@
       <div class="section-divider"></div>
       <h2 class="section-title">Your top focus</h2>
       <div id="today-focus"></div>
+    </section>
+
+    <!-- Us tab: photos timeline -->
+    <section id="tab-us" class="tab-pane">
+      <h2 class="section-title">Us <span class="date-sub">moments together</span></h2>
+      <div id="photos-empty" class="photos-empty hidden">
+        <div class="photos-empty-heart">❤</div>
+        <p class="photos-empty-text">No memories yet.<br>Tap + to add the first one.</p>
+      </div>
+      <div id="photos-timeline" class="photos-timeline"></div>
+
+      <button id="photo-fab" class="photo-fab" aria-label="Add photo">
+        <span class="photo-fab-plus">+</span>
+        <span class="photo-fab-label">Add photo</span>
+      </button>
+
+      <input id="photo-file-input" type="file" accept="image/*" capture="environment" class="visually-hidden">
+
+      <!-- Caption modal -->
+      <div id="caption-modal" class="photo-modal hidden" role="dialog" aria-modal="true" aria-labelledby="caption-modal-title">
+        <div class="photo-modal-backdrop" data-close="caption"></div>
+        <div class="photo-modal-card caption-card">
+          <h3 id="caption-modal-title" class="caption-title">New memory</h3>
+          <div class="caption-preview-wrap">
+            <img id="caption-preview" class="caption-preview" alt="">
+          </div>
+          <label class="caption-field">
+            <span class="caption-label">Caption <span class="caption-optional">(optional)</span></span>
+            <input id="caption-input" type="text" maxlength="160" placeholder="Say something sweet…">
+          </label>
+          <label class="caption-field">
+            <span class="caption-label">Date</span>
+            <input id="caption-date" type="date">
+          </label>
+          <div class="caption-poster">
+            Posted by <span id="caption-poster-name"></span>
+          </div>
+          <div id="caption-progress" class="caption-progress hidden">
+            <div class="caption-progress-bar"><div id="caption-progress-fill" class="caption-progress-fill"></div></div>
+            <div id="caption-progress-text" class="caption-progress-text">Uploading…</div>
+          </div>
+          <div class="caption-actions">
+            <button id="caption-cancel" class="caption-btn caption-btn-secondary" data-close="caption">Cancel</button>
+            <button id="caption-upload" class="caption-btn caption-btn-primary">Upload</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fullscreen viewer -->
+      <div id="viewer-modal" class="photo-viewer hidden" role="dialog" aria-modal="true">
+        <button id="viewer-close" class="viewer-close" aria-label="Close">×</button>
+        <button id="viewer-prev" class="viewer-nav viewer-prev" aria-label="Previous">‹</button>
+        <button id="viewer-next" class="viewer-nav viewer-next" aria-label="Next">›</button>
+        <div id="viewer-stage" class="viewer-stage">
+          <img id="viewer-img" class="viewer-img" alt="">
+        </div>
+        <div class="viewer-caption">
+          <div id="viewer-caption-text" class="viewer-caption-text"></div>
+          <div id="viewer-caption-meta" class="viewer-caption-meta"></div>
+        </div>
+      </div>
     </section>
 
     <!-- Habits week view -->
@@ -78,7 +140,7 @@
       <div id="outcomes-list"></div>
     </section>
 
-    <!-- Standards -->
+    <!-- Standards (formerly the "Us" tab) -->
     <section id="tab-standards" class="tab-pane">
       <p class="muted">Rate each other 1-5 during Sunday check-ins.</p>
       <h3 class="sub-title">Matthew rates Marie</h3>
@@ -107,7 +169,7 @@
       </div>
       <div class="checkin-step">
         <h3>3 · Standards check</h3>
-        <p class="muted">Switch to Us tab and rate each other.</p>
+        <p class="muted">Switch to Standards tab and rate each other.</p>
       </div>
       <div class="checkin-step">
         <h3>4 · Goals review</h3>

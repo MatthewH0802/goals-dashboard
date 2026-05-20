@@ -1,8 +1,15 @@
 // M&M Goals Dashboard - Firebase-synced app
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import {
-  getFirestore, doc, setDoc, onSnapshot
+  getFirestore, doc, setDoc, onSnapshot,
+  addDoc, collection, query, orderBy, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import {
+  getAuth, signInAnonymously, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import {
+  getStorage, ref as storageRef, uploadBytes, getDownloadURL
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAd2NcNqkltXHumBBXOGRXzSfF6cfKsUuM",
@@ -15,6 +22,8 @@ const firebaseConfig = {
 
 const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
+const auth = getAuth(fbApp);
+const storage = getStorage(fbApp);
 const DOC_REF = doc(db, "dashboard", "main");
 
 const START_DATE = "2026-05-18";
@@ -123,9 +132,17 @@ let state = {
 };
 
 let currentUser = localStorage.getItem("mm-user") || null;
+let currentUid = null;
 let currentOutcomeView = "matthew";
 let currentHabitView = "matthew";
 let writeTimer = null;
+
+// Photos state
+let photos = []; // [{ id, url, caption, takenAt (YYYY-MM-DD), uploadedAt, uploader }]
+let photosUnsub = null;
+let pendingPhotoFile = null;
+let pendingPhotoDataUrl = null;
+let viewerIndex = 0;
 
 function ready(fn) {
   if (document.readyState !== "loading") fn();
@@ -213,6 +230,38 @@ function showApp() {
   currentHabitView = currentUser;
   renderAll();
   startPresence();
+  ensureAuthAndPhotos();
+}
+
+// ---- Firebase Auth (Anonymous) -------------------------------------------
+
+async function ensureAuthAndPhotos() {
+  if (!currentUser) return;
+  try {
+    if (!auth.currentUser) {
+      await signInAnonymously(auth);
+      // currentUid is set by onAuthStateChanged listener
+    } else {
+      currentUid = auth.currentUser.uid;
+    }
+    await bindRoleToUid();
+    subscribeToPhotos();
+  } catch (e) {
+    console.error("Auth error:", e);
+  }
+}
+
+async function bindRoleToUid() {
+  if (!currentUid || !currentUser) return;
+  try {
+    await setDoc(
+      doc(db, "users", currentUid),
+      { role: currentUser, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+  } catch (e) {
+    console.error("Failed to bind role to uid:", e);
+  }
 }
 
 let _presenceHeartbeat = null;
@@ -251,6 +300,7 @@ function renderAll() {
   renderOutcomes();
   renderStandards();
   renderCheckin();
+  renderUs();
 }
 
 function renderHeader() {
@@ -507,8 +557,330 @@ function renderCheckin() {
   ).join("") || "<p class='muted'>No past check-ins yet.</p>";
 }
 
+// ---- Us tab / Photos -----------------------------------------------------
+
+const MONTH_LABELS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+
+function escapeHtml(s) {
+  return String(s || "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+}
+
+function formatPhotoDate(iso) {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(y, (m || 1) - 1, d || 1);
+  return dt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function monthKey(iso) {
+  if (!iso) return "0000-00";
+  const [y, m] = iso.split("-");
+  return `${y}-${m}`;
+}
+
+function monthLabel(key) {
+  const [y, m] = key.split("-");
+  return `${MONTH_LABELS[(parseInt(m, 10) - 1) || 0]} ${y}`;
+}
+
+function renderUs() {
+  const timeline = document.getElementById("photos-timeline");
+  const empty = document.getElementById("photos-empty");
+  if (!timeline) return;
+
+  if (!photos.length) {
+    timeline.innerHTML = "";
+    if (empty) empty.classList.remove("hidden");
+    return;
+  }
+  if (empty) empty.classList.add("hidden");
+
+  // Group photos by month
+  const groups = new Map();
+  photos.forEach(p => {
+    const k = monthKey(p.takenAt);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(p);
+  });
+
+  // Sort: months desc, photos within group already in desc order via subscription
+  const keys = Array.from(groups.keys()).sort((a, b) => b.localeCompare(a));
+
+  const html = keys.map(k => {
+    const list = groups.get(k);
+    const cards = list.map((p, idx) => {
+      const globalIdx = photos.indexOf(p);
+      const uploader = p.uploader || "";
+      const uploaderName = uploader === "matthew" ? "Matthew" : uploader === "marie" ? "Marie" : "—";
+      const caption = p.caption ? `<div class="photo-card-caption">${escapeHtml(p.caption)}</div>` : `<div class="photo-card-caption empty">No caption</div>`;
+      return `<button class="photo-card" data-idx="${globalIdx}" type="button">
+        <div class="photo-card-img-wrap"><img class="photo-card-img" loading="lazy" src="${escapeHtml(p.url)}" alt=""></div>
+        <div class="photo-card-body">
+          ${caption}
+          <div class="photo-card-meta">
+            <span>${formatPhotoDate(p.takenAt)}</span>
+            <span class="by"><span class="by-dot ${uploader}"></span>${uploaderName}</span>
+          </div>
+        </div>
+      </button>`;
+    }).join("");
+
+    return `<div class="photo-month">
+      <div class="photo-month-header">${monthLabel(k)}</div>
+      <div class="photo-grid">${cards}</div>
+    </div>`;
+  }).join("");
+
+  timeline.innerHTML = html;
+
+  timeline.querySelectorAll(".photo-card").forEach(card => {
+    card.addEventListener("click", () => {
+      const idx = parseInt(card.dataset.idx, 10);
+      openViewer(idx);
+    });
+  });
+}
+
+function subscribeToPhotos() {
+  if (photosUnsub) { try { photosUnsub(); } catch(e){} }
+  const q = query(collection(db, "photos"), orderBy("takenAt", "desc"));
+  photosUnsub = onSnapshot(q, (snap) => {
+    photos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderUs();
+  }, (err) => {
+    console.error("Photos sync error:", err);
+  });
+}
+
+function openUploadFlow() {
+  if (!currentUid) {
+    alert("Signing in… try again in a moment.");
+    ensureAuthAndPhotos();
+    return;
+  }
+  const input = document.getElementById("photo-file-input");
+  if (!input) return;
+  input.value = "";
+  input.click();
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+async function resizeImageToBlob(file, maxDim = 1600, quality = 0.85) {
+  const dataUrl = await readFileAsDataUrl(file);
+  const img = await loadImage(dataUrl);
+  let { width, height } = img;
+  if (width > maxDim || height > maxDim) {
+    const scale = Math.min(maxDim / width, maxDim / height);
+    width = Math.round(width * scale);
+    height = Math.round(height * scale);
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0, width, height);
+  const blob = await new Promise(res => canvas.toBlob(res, "image/jpeg", quality));
+  if (!blob) throw new Error("Resize failed");
+  return { blob, previewUrl: dataUrl };
+}
+
+async function onPhotoFilePicked(file) {
+  if (!file) return;
+  try {
+    const { previewUrl } = await resizeImageToBlob(file);
+    pendingPhotoFile = file;
+    pendingPhotoDataUrl = previewUrl;
+    openCaptionModal();
+  } catch (e) {
+    console.error("Failed to read photo:", e);
+    alert("Could not read that photo. Try a different one.");
+  }
+}
+
+function openCaptionModal() {
+  const modal = document.getElementById("caption-modal");
+  const preview = document.getElementById("caption-preview");
+  const captionInput = document.getElementById("caption-input");
+  const dateInput = document.getElementById("caption-date");
+  const posterName = document.getElementById("caption-poster-name");
+  const progress = document.getElementById("caption-progress");
+  const fill = document.getElementById("caption-progress-fill");
+
+  if (!modal) return;
+  if (preview && pendingPhotoDataUrl) preview.src = pendingPhotoDataUrl;
+  if (captionInput) captionInput.value = "";
+  if (dateInput) dateInput.value = todayISO();
+  if (posterName) posterName.textContent = currentUser === "matthew" ? "Matthew" : "Marie";
+  if (progress) progress.classList.add("hidden");
+  if (fill) fill.style.width = "0%";
+
+  document.getElementById("caption-upload").disabled = false;
+  document.getElementById("caption-cancel").disabled = false;
+
+  modal.classList.remove("hidden");
+}
+
+function closeCaptionModal() {
+  const modal = document.getElementById("caption-modal");
+  if (modal) modal.classList.add("hidden");
+  pendingPhotoFile = null;
+  pendingPhotoDataUrl = null;
+}
+
+async function uploadPhoto(file, caption, takenAt) {
+  if (!currentUid) throw new Error("Not signed in");
+  setSyncStatus("syncing");
+
+  const progress = document.getElementById("caption-progress");
+  const fill = document.getElementById("caption-progress-fill");
+  const text = document.getElementById("caption-progress-text");
+  const uploadBtn = document.getElementById("caption-upload");
+  const cancelBtn = document.getElementById("caption-cancel");
+
+  if (progress) progress.classList.remove("hidden");
+  if (uploadBtn) uploadBtn.disabled = true;
+  if (cancelBtn) cancelBtn.disabled = true;
+  if (text) text.textContent = "Resizing…";
+  if (fill) fill.style.width = "10%";
+
+  const { blob } = await resizeImageToBlob(file);
+
+  if (text) text.textContent = "Uploading…";
+  if (fill) fill.style.width = "45%";
+
+  const filename = `photos/${currentUid}_${Date.now()}.jpg`;
+  const ref = storageRef(storage, filename);
+  await uploadBytes(ref, blob, { contentType: "image/jpeg" });
+
+  if (text) text.textContent = "Saving…";
+  if (fill) fill.style.width = "80%";
+
+  const url = await getDownloadURL(ref);
+
+  await addDoc(collection(db, "photos"), {
+    url,
+    caption: caption || "",
+    takenAt: takenAt || todayISO(),
+    uploadedAt: serverTimestamp(),
+    uploader: currentUser
+  });
+
+  if (fill) fill.style.width = "100%";
+  if (text) text.textContent = "Done";
+  setSyncStatus("synced");
+}
+
+// ---- Fullscreen viewer ---------------------------------------------------
+
+function openViewer(idx) {
+  const modal = document.getElementById("viewer-modal");
+  if (!modal || !photos.length) return;
+  viewerIndex = Math.max(0, Math.min(photos.length - 1, idx));
+  renderViewer();
+  modal.classList.remove("hidden");
+}
+
+function closeViewer() {
+  const modal = document.getElementById("viewer-modal");
+  if (modal) modal.classList.add("hidden");
+}
+
+function renderViewer() {
+  const p = photos[viewerIndex];
+  if (!p) return;
+  const img = document.getElementById("viewer-img");
+  const capText = document.getElementById("viewer-caption-text");
+  const capMeta = document.getElementById("viewer-caption-meta");
+  const prev = document.getElementById("viewer-prev");
+  const next = document.getElementById("viewer-next");
+  if (img) img.src = p.url;
+  if (capText) {
+    if (p.caption) {
+      capText.textContent = p.caption;
+      capText.classList.remove("empty");
+    } else {
+      capText.textContent = "—";
+      capText.classList.add("empty");
+    }
+  }
+  if (capMeta) {
+    const uploader = p.uploader === "matthew" ? "Matthew" : p.uploader === "marie" ? "Marie" : "";
+    capMeta.textContent = `${formatPhotoDate(p.takenAt)}${uploader ? " · " + uploader : ""}`;
+  }
+  if (prev) prev.disabled = viewerIndex <= 0;
+  if (next) next.disabled = viewerIndex >= photos.length - 1;
+}
+
+function viewerNext() {
+  if (viewerIndex < photos.length - 1) {
+    viewerIndex++;
+    renderViewer();
+  }
+}
+function viewerPrev() {
+  if (viewerIndex > 0) {
+    viewerIndex--;
+    renderViewer();
+  }
+}
+
+function attachViewerSwipe() {
+  const stage = document.getElementById("viewer-stage");
+  if (!stage) return;
+  let startX = 0;
+  let startY = 0;
+  let tracking = false;
+  stage.addEventListener("touchstart", (e) => {
+    if (e.touches.length !== 1) return;
+    tracking = true;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+  stage.addEventListener("touchend", (e) => {
+    if (!tracking) return;
+    tracking = false;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - startX;
+    const dy = t.clientY - startY;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+      if (dx < 0) viewerNext();
+      else viewerPrev();
+    }
+  }, { passive: true });
+}
+
+// ---- App bootstrap -------------------------------------------------------
+
 ready(() => {
   console.log("M&M app initializing");
+
+  // Track auth state so currentUid is always fresh
+  onAuthStateChanged(auth, (user) => {
+    currentUid = user ? user.uid : null;
+    if (user && currentUser) {
+      bindRoleToUid();
+      subscribeToPhotos();
+    }
+  });
 
   document.querySelectorAll(".who-btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -566,6 +938,66 @@ ready(() => {
     pushToFirebase();
     renderCheckin();
     alert("Saved!");
+  });
+
+  // --- Photos wiring ---
+  const fab = document.getElementById("photo-fab");
+  if (fab) fab.addEventListener("click", openUploadFlow);
+
+  const fileInput = document.getElementById("photo-file-input");
+  if (fileInput) {
+    fileInput.addEventListener("change", (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) onPhotoFilePicked(file);
+    });
+  }
+
+  // Caption modal close (backdrop + cancel)
+  document.querySelectorAll('[data-close="caption"]').forEach(el => {
+    el.addEventListener("click", closeCaptionModal);
+  });
+
+  const uploadBtn = document.getElementById("caption-upload");
+  if (uploadBtn) {
+    uploadBtn.addEventListener("click", async () => {
+      if (!pendingPhotoFile) return;
+      const caption = document.getElementById("caption-input").value.trim();
+      const takenAt = document.getElementById("caption-date").value || todayISO();
+      try {
+        await uploadPhoto(pendingPhotoFile, caption, takenAt);
+        closeCaptionModal();
+      } catch (e) {
+        console.error("Upload failed:", e);
+        alert("Upload failed. Please try again.");
+        const upBtn = document.getElementById("caption-upload");
+        const cnBtn = document.getElementById("caption-cancel");
+        if (upBtn) upBtn.disabled = false;
+        if (cnBtn) cnBtn.disabled = false;
+        setSyncStatus("offline");
+      }
+    });
+  }
+
+  // Viewer wiring
+  const viewerClose = document.getElementById("viewer-close");
+  if (viewerClose) viewerClose.addEventListener("click", closeViewer);
+  const viewerPrevBtn = document.getElementById("viewer-prev");
+  if (viewerPrevBtn) viewerPrevBtn.addEventListener("click", viewerPrev);
+  const viewerNextBtn = document.getElementById("viewer-next");
+  if (viewerNextBtn) viewerNextBtn.addEventListener("click", viewerNext);
+  attachViewerSwipe();
+
+  document.addEventListener("keydown", (e) => {
+    const viewer = document.getElementById("viewer-modal");
+    if (viewer && !viewer.classList.contains("hidden")) {
+      if (e.key === "Escape") closeViewer();
+      else if (e.key === "ArrowRight") viewerNext();
+      else if (e.key === "ArrowLeft") viewerPrev();
+    }
+    const caption = document.getElementById("caption-modal");
+    if (caption && !caption.classList.contains("hidden") && e.key === "Escape") {
+      closeCaptionModal();
+    }
   });
 
   if (currentUser) showApp();
