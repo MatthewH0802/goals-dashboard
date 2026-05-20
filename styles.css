@@ -1494,3 +1494,78 @@ summary {
 .settings-danger-row .settings-danger-btn {
   flex: 1;
 }
+/* ============================================================
+   Phase 2B — Notifications (thinking-of-you heart + banner)
+   ============================================================ */
+
+.thinking-heart {
+  background: transparent;
+  border: none;
+  padding: 4px 6px;
+  margin-left: 4px;
+  font-size: 18px;
+  line-height: 1;
+  color: #d33;
+  opacity: 0.35;
+  cursor: pointer;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.thinking-heart:hover,
+.thinking-heart:focus {
+  opacity: 1;
+  outline: none;
+}
+.thinking-heart:active {
+  transform: scale(0.9);
+}
+.thinking-heart.pulse {
+  animation: heart-pulse 0.7s ease-out;
+}
+@keyframes heart-pulse {
+  0%   { transform: scale(1);   opacity: 0.35; }
+  20%  { transform: scale(1.4); opacity: 1;    }
+  60%  { transform: scale(0.95); opacity: 0.9; }
+  100% { transform: scale(1);   opacity: 0.35; }
+}
+
+/* Notification permission banner (shown when denied/dismissed) */
+.notif-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 16px 0;
+  padding: 10px 12px;
+  background: #fdf6e3;
+  border: 1px solid #ead9a8;
+  border-radius: 10px;
+  font-size: 13px;
+  color: #5a4a1c;
+}
+.notif-banner.hidden { display: none; }
+.notif-banner-text { flex: 1; }
+.notif-banner-btn {
+  background: #5a4a1c;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.notif-banner-btn:hover { background: #3d3212; }
+.notif-banner-dismiss {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  color: #5a4a1c;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+/* Toast bump for ping receipts — uses existing .toast but with a soft red glow */
+.toast.ping {
+  background: #d33;
+  color: #fff;
+}

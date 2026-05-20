@@ -10,6 +10,9 @@ import {
 import {
   getStorage, ref as storageRef, uploadBytes, getDownloadURL
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
+import {
+  getMessaging, getToken, onMessage, isSupported as isMessagingSupported
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAd2NcNqkltXHumBBXOGRXzSfF6cfKsUuM",
@@ -25,6 +28,13 @@ const db = getFirestore(fbApp);
 const auth = getAuth(fbApp);
 const storage = getStorage(fbApp);
 const DOC_REF = doc(db, "dashboard", "main");
+
+// ---- FCM / push notification config ------------------------------------
+const FCM_VAPID_KEY = "BP3cq5EEyQC5xODtPSrxvfrYujzjiU0yGNWMDuYjTDRUAE4E4C_cdTXNVEbc6ss8fMm8CS143f1rkV1K5cDrMzA";
+let messaging = null;            // initialized lazily inside setupNotifications()
+let _notifSetupStarted = false;  // run setupNotifications() at most once per session
+let _lastPingAt = 0;             // for the 30s client-side throttle on the heart button
+
 
 // ---- Built-in defaults (used to seed config/* on first run) -------------
 const DEFAULT_START_DATE = "2026-05-18";
@@ -402,6 +412,13 @@ async function showApp() {
   renderAll();
   startPresence();
   ensureAuthAndPhotos();
+
+  // Notifications: wait a couple seconds after the dashboard renders before
+  // prompting for permission, so the user can see the app first.
+  if (!_notifSetupStarted) {
+    _notifSetupStarted = true;
+    setTimeout(() => { setupNotifications().catch(e => console.warn("notif setup:", e)); }, 2000);
+  }
 }
 
 // ---- Role claim (UID allowlist) -----------------------------------------
@@ -1714,6 +1731,145 @@ async function resetDefaults() {
   }
 }
 
+// ---- Notifications (FCM web push) ----------------------------------------
+//
+// Manual ping flow: tap the heart in the header → writes /pings/<auto-id> with
+// { from, to, fromUid, ts }. A Cloud Function (functions/index.js) picks it up
+// and sends an FCM message to the partner's stored device token, then deletes
+// the doc. Foreground messages (app focused) are surfaced via an in-app toast
+// since the OS suppresses the banner in that case.
+
+function showNotifBanner(show) {
+  const el = document.getElementById("notif-banner");
+  if (!el) return;
+  el.classList.toggle("hidden", !show);
+}
+
+async function setupNotifications(retry) {
+  if (!currentUser || !currentUid) return;
+  if (!("Notification" in window) || !("serviceWorker" in navigator)) return;
+
+  // Skip if Messaging is unsupported (Safari < 16, etc.) — feature degrades gracefully.
+  try {
+    const ok = await isMessagingSupported();
+    if (!ok) return;
+  } catch (_) { return; }
+
+  // Don't nag: only ask once unless the user explicitly retries.
+  if (!retry) {
+    try {
+      const usnap = await getDoc(doc(db, "users", currentUid));
+      if (usnap.exists() && usnap.data().notificationPermissionAsked && Notification.permission === "default") {
+        // Asked before, still in default state (dismissed without choosing) — show the banner.
+        showNotifBanner(true);
+        return;
+      }
+    } catch (e) { /* non-fatal */ }
+  }
+
+  // Wait for /firebase-messaging-sw.js to be ready before requesting a token.
+  let swReg = null;
+  try {
+    swReg = await navigator.serviceWorker.ready;
+  } catch (e) {
+    console.warn("SW not ready:", e);
+    return;
+  }
+
+  let perm = Notification.permission;
+  if (perm === "default") {
+    try { perm = await Notification.requestPermission(); }
+    catch (e) { perm = "denied"; }
+    // Remember that we asked, so we don't auto-prompt again.
+    try {
+      await setDoc(doc(db, "users", currentUid),
+        { notificationPermissionAsked: true, updatedAt: serverTimestamp() },
+        { merge: true });
+    } catch (_) { /* non-fatal */ }
+  }
+
+  if (perm !== "granted") {
+    showNotifBanner(true);
+    return;
+  }
+  showNotifBanner(false);
+
+  // Initialize Messaging lazily, only after permission is granted.
+  if (!messaging) {
+    try { messaging = getMessaging(fbApp); }
+    catch (e) { console.warn("getMessaging:", e); return; }
+  }
+
+  // Get the FCM device token and store it on /users/<uid>.
+  let token = null;
+  try {
+    token = await getToken(messaging, { vapidKey: FCM_VAPID_KEY, serviceWorkerRegistration: swReg });
+  } catch (e) {
+    console.warn("getToken failed:", e);
+    return;
+  }
+  if (!token) return;
+
+  try {
+    await setDoc(doc(db, "users", currentUid),
+      { fcmToken: token, fcmTokenUpdatedAt: serverTimestamp(), role: currentUser },
+      { merge: true });
+  } catch (e) { console.warn("save fcmToken:", e); }
+
+  // Foreground messages: OS won't show a banner, so toast it.
+  try {
+    onMessage(messaging, (payload) => {
+      const title = (payload && payload.notification && payload.notification.title)
+        || (payload && payload.data && payload.data.title)
+        || "M&M";
+      showToast(title);
+      // Tiny pulse on the heart so the receiver sees something visual.
+      const h = document.getElementById("thinking-heart");
+      if (h) {
+        h.classList.remove("pulse");
+        void h.offsetWidth;
+        h.classList.add("pulse");
+      }
+    });
+  } catch (e) { console.warn("onMessage:", e); }
+}
+
+async function sendThinkingPing() {
+  if (!currentUser || !currentUid) return;
+
+  const now = Date.now();
+  if (now - _lastPingAt < 30000) {
+    const secs = Math.ceil((30000 - (now - _lastPingAt)) / 1000);
+    showToast("Wait " + secs + "s before sending again.");
+    return;
+  }
+  _lastPingAt = now;
+
+  const partner = currentUser === "matthew" ? "marie" : "matthew";
+
+  // Optimistic UX: pulse the heart + toast immediately.
+  const h = document.getElementById("thinking-heart");
+  if (h) {
+    h.classList.remove("pulse");
+    void h.offsetWidth;
+    h.classList.add("pulse");
+  }
+  showToast("\u2764 sent to " + profileName(partner));
+
+  try {
+    await addDoc(collection(db, "pings"), {
+      from: currentUser,
+      to: partner,
+      fromUid: currentUid,
+      ts: serverTimestamp()
+    });
+  } catch (e) {
+    console.error("ping write failed:", e);
+    showToast("Couldn't send. Try again.", "error");
+    _lastPingAt = 0; // allow immediate retry on failure
+  }
+}
+
 // ---- App bootstrap -------------------------------------------------------
 
 ready(() => {
@@ -1954,6 +2110,23 @@ ready(() => {
       const ok = await resetRoleClaim("marie");
       if (ok) showToast("Marie's slot is open.");
       else showToast("Couldn't reset that slot.", "error");
+    });
+  }
+
+  // ---- Notifications: heart button + banner wiring ----------------------
+  const heartBtn = document.getElementById("thinking-heart");
+  if (heartBtn) {
+    heartBtn.addEventListener("click", () => { sendThinkingPing().catch(e => console.error("ping:", e)); });
+  }
+  const notifRetryBtn = document.getElementById("notif-banner-retry");
+  if (notifRetryBtn) {
+    notifRetryBtn.addEventListener("click", () => { setupNotifications(true).catch(e => console.warn("retry notif:", e)); });
+  }
+  const notifDismissBtn = document.getElementById("notif-banner-dismiss");
+  if (notifDismissBtn) {
+    notifDismissBtn.addEventListener("click", () => {
+      const banner = document.getElementById("notif-banner");
+      if (banner) banner.classList.add("hidden");
     });
   }
 
