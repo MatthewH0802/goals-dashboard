@@ -35,6 +35,60 @@ let messaging = null;            // initialized lazily inside setupNotifications
 let _notifSetupStarted = false;  // run setupNotifications() at most once per session
 let _lastPingAt = 0;             // for the 30s client-side throttle on the heart button
 
+// ---- Phosphor icon mapping for habits (POLISH V2) -----------------------
+// Keyed by habit id substring or by lowercased name token. First match wins.
+// Falls back to "circle-half" if nothing matches.
+const HABIT_ICON_RULES = [
+  [/\b(gym|workout|lift)\b/i,      "barbell"],
+  [/\b(run|cardio)\b/i,             "person-simple-run"],
+  [/\b(vitamin|medication)\b/i,     "pill"],
+  [/\bwater\b/i,                    "drop"],
+  [/\b(bedtime|sleep)\b/i,          "moon"],
+  [/\b(wake|morning)\b/i,           "sun"],
+  [/\bscreen\b/i,                   "device-mobile-slash"],
+  [/\bchess\b/i,                    "chess-knight"],
+  [/\b(agpeya|prayer)\b/i,          "hands-praying"],
+  [/\b(read|book|reading)\b/i,      "book-open"],
+  [/\bconfession\b/i,               "door"],
+  [/\bcommunion\b/i,                "wine"],
+  [/\b(liturgy|church|synaxarium)\b/i, "church"],
+  [/\b(fast|fasting)\b/i,           "bowl-food"],
+  [/\b(date|night)\b/i,             "flower"],
+  [/\b(watch|teleparty|tv|movie)\b/i, "film-reel"],
+  [/\bpray.*together\b/i,           "flame"],
+  [/\b(checkin|check-in|check_in|talk|call)\b/i, "chats-circle"],
+  [/\bstudy\b/i,                    "notebook"],
+  [/\banki\b/i,                     "cards"],
+  [/\b(clinical|dental|tooth|lab)\b/i, "tooth"],
+  [/\bphone\b/i,                    "phone"],
+  [/\b(note|letter|love note)\b/i,  "envelope"],
+  [/\bplan\b/i,                     "calendar-blank"],
+  [/\bsweet\b/i,                    "cookie"],
+  [/\big|influence|photo\b/i,       "camera"]
+];
+function iconForHabit(h) {
+  if (!h) return "circle-half";
+  if (h.icon) return h.icon;
+  const id = (h.id || "").toLowerCase();
+  const name = (h.name || "").toLowerCase();
+  const hay = id + " " + name;
+  for (const [rx, icon] of HABIT_ICON_RULES) {
+    if (rx.test(hay)) return icon;
+  }
+  return "circle-half";
+}
+function iconTag(h, cls) {
+  const icon = iconForHabit(h);
+  return `<i class="ph-thin ph-${icon} ${cls || ""}" aria-hidden="true"></i>`;
+}
+
+// Postmark date renderer: "WED · 20 MAY · 2026"
+function formatPostmark(d) {
+  d = d || new Date();
+  const wk = ["SUN","MON","TUE","WED","THU","FRI","SAT"][d.getDay()];
+  const mn = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"][d.getMonth()];
+  return `${wk} · ${d.getDate()} ${mn} · ${d.getFullYear()}`;
+}
 
 // ---- Built-in defaults (used to seed config/* on first run) -------------
 const DEFAULT_START_DATE = "2026-05-18";
@@ -622,8 +676,11 @@ function showLogin() {
   if (denied) denied.classList.remove("active");
   const loginDate = document.getElementById("login-date");
   if (loginDate) {
-    loginDate.textContent = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+    loginDate.classList.add("postmark");
+    loginDate.textContent = formatPostmark(new Date());
   }
+  // POLISH V2: paint login background photo if any uploaded
+  try { setLoginBackground(); } catch (e) {}
 }
 
 function showAccessDenied() {
@@ -1037,7 +1094,7 @@ function habitCardHtml(h, today, locked) {
   }
   return `<button class="quick-log-btn ${done ? "done" : ""}" data-habit="${h.id}" ${locked ? "disabled" : ""} title="${escapeHtml(h.name || "")}">
     ${attr}
-    <span class="qlog-emoji">${h.emoji || ""}</span>
+    ${iconTag(h, "qlog-icon")}
     <span class="qlog-check">✓</span>
     ${streak > 0 ? `<span class="qlog-streak">${streak} day${streak === 1 ? "" : "s"}</span>` : ""}
     <span class="qlog-name">${escapeHtml(h.name || "")}</span>
@@ -1055,16 +1112,32 @@ function renderGreeting() {
   else if (h >= 17 && h < 22) period = "evening";
   else period = "night";
   const name = currentUser ? profileName(currentUser) : "";
-  const text = `Good ${period}, ${name}.`;
-  const first = text.charAt(0);
-  const rest = text.slice(1);
-  el.innerHTML = `<span class="drop-cap">${escapeHtml(first)}</span>${escapeHtml(rest)}`;
+  const prefix = `Good ${period}, `;
+  const first = prefix.charAt(0);
+  const rest = prefix.slice(1);
+  // Wrap name in [data-name] so it inherits the italic-name style.
+  el.innerHTML = `<span class="drop-cap">${escapeHtml(first)}</span>${escapeHtml(rest)}<span data-name="${escapeHtml(currentUser || "")}">${escapeHtml(name)}</span>.`;
+  // Retrigger drop-cap entrance animation on every render
+  el.style.animation = "none";
+  // force reflow
+  void el.offsetHeight;
+  el.style.animation = "";
 }
 
 function renderToday() {
   const today = todayISO();
   renderGreeting();
-  document.getElementById("today-date").textContent = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  // Today date — render as postmark
+  const td = document.getElementById("today-date");
+  if (td) {
+    td.classList.add("postmark");
+    td.textContent = formatPostmark(new Date());
+  }
+  // Masthead date
+  const md = document.getElementById("masthead-date");
+  if (md) md.textContent = formatPostmark(new Date());
+  // Today hero photo (deterministic pick by today's date % photos.length)
+  renderTodayHeroPhoto();
 
   const habits = config.habits || { matthew: [], marie: [], shared: [] };
   const myHabits = habits[currentUser] || [];
@@ -1088,6 +1161,10 @@ function renderToday() {
     </div>`;
   });
   document.getElementById("today-habits").innerHTML = html;
+
+  // Stagger-fade-in: assign --card-i so CSS animation-delay cascades.
+  const cards = document.querySelectorAll("#today-habits .quick-log-btn");
+  cards.forEach((c, i) => { c.style.setProperty("--card-i", i); });
 
   // Hero line: You: done/total today
   const myDone = allMine.filter(h => state.habitLog[today + "_" + h.id] === "done").length;
@@ -1154,7 +1231,7 @@ function renderHabitsWeek() {
   habits.forEach(h => {
     const streak = getStreak(h.id);
     html += `<div class="habit-row">
-      <div class="habit-name">${h.emoji || ""} ${escapeHtml(h.name || "")}<span class="sub">${escapeHtml(h.target || "")}</span></div>
+      <div class="habit-name">${iconTag(h, "habit-row-icon")} ${escapeHtml(h.name || "")}<span class="sub">${escapeHtml(h.target || "")}</span></div>
       ${week.map(d => {
         const dStr = isoDate(d);
         const k = dStr + "_" + h.id;
@@ -1303,6 +1380,52 @@ function monthLabel(key) {
   return `${MONTH_LABELS[(parseInt(m, 10) - 1) || 0]} ${y}`;
 }
 
+// ---- POLISH V2 — Photography hooks --------------------------------------
+function renderTodayHeroPhoto() {
+  const fig = document.getElementById("today-hero-photo");
+  const img = document.getElementById("today-hero-img");
+  const cap = document.getElementById("today-hero-cap");
+  if (!fig || !img || !cap) return;
+  if (!Array.isArray(photos) || !photos.length) {
+    fig.classList.add("hidden");
+    img.removeAttribute("src");
+    cap.textContent = "";
+    return;
+  }
+  const idx = new Date().getDate() % photos.length;
+  const p = photos[idx];
+  if (!p || !p.url) {
+    fig.classList.add("hidden");
+    return;
+  }
+  fig.classList.remove("hidden");
+  img.src = p.url;
+  const dateStr = formatPhotoDate(p.takenAt);
+  const capText = (p.caption || "").trim();
+  cap.textContent = capText ? `${capText} — ${dateStr}` : dateStr;
+}
+
+function setLoginBackground() {
+  const bg = document.getElementById("login-bg");
+  if (!bg) return;
+  if (!Array.isArray(photos) || !photos.length) {
+    bg.classList.remove("loaded");
+    bg.removeAttribute("src");
+    return;
+  }
+  const p = photos[0];
+  if (!p || !p.url) return;
+  const next = new Image();
+  next.onload = () => {
+    bg.src = p.url;
+    bg.classList.add("loaded");
+  };
+  next.onerror = () => {
+    bg.classList.remove("loaded");
+  };
+  next.src = p.url;
+}
+
 function renderUs() {
   const timeline = document.getElementById("photos-timeline");
   const empty = document.getElementById("photos-empty");
@@ -1367,6 +1490,9 @@ function subscribeToPhotos() {
   photosUnsub = onSnapshot(q, (snap) => {
     photos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderUs();
+    // POLISH V2: refresh photography hooks on every snapshot
+    try { renderTodayHeroPhoto(); } catch (e) {}
+    try { setLoginBackground(); } catch (e) {}
   }, (err) => {
     console.error("Photos sync error:", err);
   });
@@ -3009,10 +3135,27 @@ ready(() => {
 
   document.querySelectorAll(".tab-btn").forEach(btn => {
     btn.addEventListener("click", () => {
+      const targetId = "tab-" + btn.dataset.tab;
+      const currentActive = document.querySelector(".tab-pane.active");
+      const next = document.getElementById(targetId);
+      if (currentActive === next) return;
       document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b === btn));
-      document.querySelectorAll(".tab-pane").forEach(p =>
-        p.classList.toggle("active", p.id === "tab-" + btn.dataset.tab)
-      );
+      if (currentActive) {
+        currentActive.classList.add("pane-leave");
+        setTimeout(() => {
+          currentActive.classList.remove("active");
+          currentActive.classList.remove("pane-leave");
+          if (next) {
+            next.classList.add("pane-enter");
+            next.classList.add("active");
+            // force reflow then drop the enter class
+            void next.offsetHeight;
+            next.classList.remove("pane-enter");
+          }
+        }, 180);
+      } else if (next) {
+        next.classList.add("active");
+      }
     });
   });
 

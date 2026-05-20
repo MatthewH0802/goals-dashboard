@@ -15,10 +15,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,300;1,9..144,400&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,400;1,500&family=Caveat:wght@400;500&display=swap">
+  <link rel="stylesheet" type="text/css" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/thin/style.css">
 </head>
 <body>
   <!-- Login screen -->
   <div id="login-screen" class="screen active">
+    <img id="login-bg" class="login-bg" alt="" aria-hidden="true">
+    <div class="login-bg-overlay" aria-hidden="true"></div>
     <div class="login-box">
       <h1 class="login-mono">M&amp;M</h1>
       <div class="login-rule" aria-hidden="true"></div>
@@ -34,7 +38,7 @@
   <!-- Access denied screen -->
   <div id="denied-screen" class="screen">
     <div class="denied-box">
-      <h1 class="denied-mark">&#9888;</h1>
+      <h1 class="denied-mark"><i class="ph-thin ph-warning" aria-hidden="true"></i></h1>
       <p class="denied-title">This device isn't authorized.</p>
       <p class="denied-body">
         The Matthew and Marie roles have both been claimed by other devices.
@@ -61,8 +65,8 @@
       <div class="header-right">
         <span id="sync-dot" class="sync-dot" data-state="synced" aria-label="Synced" title="Synced"></span>
         <span id="sync-offline-label" class="sync-offline-label hidden">offline</span>
-        <button id="thinking-heart" class="thinking-heart" aria-label="Send a thinking-of-you ping" title="Thinking of you">&#10084;</button>
-        <button id="open-settings" class="settings-btn" aria-label="Settings" title="Settings">&#9881;</button>
+        <button id="thinking-heart" class="thinking-heart" aria-label="Send a thinking-of-you ping" title="Thinking of you"><i class="ph-thin ph-heart" aria-hidden="true"></i></button>
+        <button id="open-settings" class="settings-btn" aria-label="Settings" title="Settings"><i class="ph-thin ph-gear-six" aria-hidden="true"></i></button>
         <button id="switch-user" class="switch-btn">switch</button>
       </div>
     </header>
@@ -72,7 +76,7 @@
     <div id="notif-banner" class="notif-banner hidden">
       <span class="notif-banner-text">Turn on notifications to get pings from your partner.</span>
       <button id="notif-banner-retry" class="notif-banner-btn">Tap to retry</button>
-      <button id="notif-banner-dismiss" class="notif-banner-dismiss" aria-label="Dismiss">&times;</button>
+      <button id="notif-banner-dismiss" class="notif-banner-dismiss" aria-label="Dismiss"><i class="ph-thin ph-x" aria-hidden="true"></i></button>
     </div>
 
     <nav class="tabs">
@@ -88,9 +92,28 @@
 
     <!-- Today tab: big quick-log buttons -->
     <section id="tab-today" class="tab-pane active">
+      <header id="today-masthead" class="today-masthead" aria-label="Today masthead">
+        <div class="masthead-rule" aria-hidden="true"></div>
+        <div class="masthead-row">
+          <span id="masthead-date" class="postmark masthead-date"></span>
+          <span class="masthead-title">M&amp;M Daily</span>
+        </div>
+        <div class="masthead-rule" aria-hidden="true"></div>
+      </header>
+
+      <figure id="today-hero-photo" class="today-hero-photo hidden">
+        <div class="today-hero-photo-frame">
+          <img id="today-hero-img" class="today-hero-img" alt="" loading="lazy">
+        </div>
+        <figcaption id="today-hero-cap" class="today-hero-cap"></figcaption>
+      </figure>
+
       <div id="today-greeting" class="today-greeting"></div>
       <p id="hero-line" class="hero-line empty"></p>
       <p class="today-date-line"><span id="today-date" class="today-date"></span></p>
+
+      <div class="lead-divider lead-divider-top" aria-hidden="true"></div>
+      <h2 class="section-title habits-section-title"><span class="section-title-text postmark">Habits &middot; today</span></h2>
       <div id="today-habits"></div>
 
       <div class="section-divider"></div>
@@ -103,7 +126,7 @@
       <h2 class="section-title"><span class="section-title-text">Us</span> <span class="date-sub">moments together</span></h2>
       <div id="photos-empty" class="photos-empty hidden">
         <div class="photos-empty-heart" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 12.572l-7.5 7.428l-7.5-7.428a5 5 0 1 1 7.5-6.566a5 5 0 1 1 7.5 6.572"/></svg>
+          <i class="ph-thin ph-heart-straight"></i>
         </div>
         <p class="photos-empty-text">No memories yet.</p>
         <p class="photos-empty-sub">Tap + to add the first one.</p>
@@ -111,7 +134,7 @@
       <div id="photos-timeline" class="photos-timeline"></div>
 
       <button id="photo-fab" class="photo-fab" aria-label="Add photo">
-        <span class="photo-fab-plus">+</span>
+        <i class="ph-thin ph-plus photo-fab-plus" aria-hidden="true"></i>
         <span class="photo-fab-label">Add photo</span>
       </button>
 
@@ -150,9 +173,9 @@
 
       <!-- Fullscreen viewer -->
       <div id="viewer-modal" class="photo-viewer hidden" role="dialog" aria-modal="true">
-        <button id="viewer-close" class="viewer-close" aria-label="Close">&times;</button>
-        <button id="viewer-prev" class="viewer-nav viewer-prev" aria-label="Previous">&lsaquo;</button>
-        <button id="viewer-next" class="viewer-nav viewer-next" aria-label="Next">&rsaquo;</button>
+        <button id="viewer-close" class="viewer-close" aria-label="Close"><i class="ph-thin ph-x" aria-hidden="true"></i></button>
+        <button id="viewer-prev" class="viewer-nav viewer-prev" aria-label="Previous"><i class="ph-thin ph-caret-left" aria-hidden="true"></i></button>
+        <button id="viewer-next" class="viewer-nav viewer-next" aria-label="Next"><i class="ph-thin ph-caret-right" aria-hidden="true"></i></button>
         <div id="viewer-stage" class="viewer-stage">
           <img id="viewer-img" class="viewer-img" alt="">
         </div>
@@ -198,7 +221,7 @@
       <div class="question-card">
         <div class="q-label">Discussion question</div>
         <p id="discussion-q"></p>
-        <button id="new-q" class="text-btn">New question &#8635;</button>
+        <button id="new-q" class="text-btn">New question <i class="ph-thin ph-arrows-clockwise" aria-hidden="true"></i></button>
       </div>
       <div class="checkin-step">
         <h3>1 &middot; Gratitude</h3>
@@ -238,7 +261,7 @@
     <div id="settings-overlay" class="settings-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
       <header class="settings-header">
         <h2 id="settings-title" class="settings-title">Settings</h2>
-        <button id="settings-close" class="settings-close" aria-label="Close settings">&times;</button>
+        <button id="settings-close" class="settings-close" aria-label="Close settings"><i class="ph-thin ph-x" aria-hidden="true"></i></button>
       </header>
 
       <div class="settings-body">
@@ -247,7 +270,7 @@
         <section class="settings-section" data-section="profiles">
           <button class="settings-section-header" data-toggle="profiles">
             <span class="settings-section-label">Profiles</span>
-            <span class="settings-section-chev">&#9656;</span>
+            <i class="ph-thin ph-caret-right settings-section-chev" aria-hidden="true"></i>
           </button>
           <div class="settings-section-body" data-body="profiles">
             <div id="settings-profiles"></div>
@@ -258,7 +281,7 @@
         <section class="settings-section" data-section="visits">
           <button class="settings-section-header" data-toggle="visits">
             <span class="settings-section-label">Visits</span>
-            <span class="settings-section-chev">&#9656;</span>
+            <i class="ph-thin ph-caret-right settings-section-chev" aria-hidden="true"></i>
           </button>
           <div class="settings-section-body" data-body="visits">
             <div class="settings-subheader-actions">
@@ -274,7 +297,7 @@
         <section class="settings-section" data-section="habits">
           <button class="settings-section-header" data-toggle="habits">
             <span class="settings-section-label">Habits</span>
-            <span class="settings-section-chev">&#9656;</span>
+            <i class="ph-thin ph-caret-right settings-section-chev" aria-hidden="true"></i>
           </button>
           <div class="settings-section-body" data-body="habits">
             <div class="settings-tabs" data-group="habits">
@@ -297,7 +320,7 @@
         <section class="settings-section" data-section="goals">
           <button class="settings-section-header" data-toggle="goals">
             <span class="settings-section-label">Goals</span>
-            <span class="settings-section-chev">&#9656;</span>
+            <i class="ph-thin ph-caret-right settings-section-chev" aria-hidden="true"></i>
           </button>
           <div class="settings-section-body" data-body="goals">
             <div class="settings-tabs" data-group="goals">
@@ -320,7 +343,7 @@
         <section class="settings-section" data-section="standards">
           <button class="settings-section-header" data-toggle="standards">
             <span class="settings-section-label">Standards</span>
-            <span class="settings-section-chev">&#9656;</span>
+            <i class="ph-thin ph-caret-right settings-section-chev" aria-hidden="true"></i>
           </button>
           <div class="settings-section-body" data-body="standards">
             <div class="settings-tabs" data-group="standards">
@@ -342,7 +365,7 @@
         <section class="settings-section" data-section="questions">
           <button class="settings-section-header" data-toggle="questions">
             <span class="settings-section-label">Check-in questions</span>
-            <span class="settings-section-chev">&#9656;</span>
+            <i class="ph-thin ph-caret-right settings-section-chev" aria-hidden="true"></i>
           </button>
           <div class="settings-section-body" data-body="questions">
             <div class="settings-subheader-actions">
@@ -358,7 +381,7 @@
         <section class="settings-section" data-section="app">
           <button class="settings-section-header" data-toggle="app">
             <span class="settings-section-label">App</span>
-            <span class="settings-section-chev">&#9656;</span>
+            <i class="ph-thin ph-caret-right settings-section-chev" aria-hidden="true"></i>
           </button>
           <div class="settings-section-body" data-body="app">
             <div id="settings-app"></div>
@@ -401,7 +424,7 @@
         <section class="settings-section settings-danger" data-section="danger">
           <button class="settings-section-header" data-toggle="danger">
             <span class="settings-section-label">Danger zone</span>
-            <span class="settings-section-chev">&#9656;</span>
+            <i class="ph-thin ph-caret-right settings-section-chev" aria-hidden="true"></i>
           </button>
           <div class="settings-section-body" data-body="danger">
             <button id="settings-reset-defaults" class="settings-danger-btn">Reset all habits &amp; goals to defaults</button>

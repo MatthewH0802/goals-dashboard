@@ -8,11 +8,28 @@
 :root {
   /* Cross-theme tokens (fonts + radii) */
   --font-serif: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-serif-italic: "Cormorant Garamond", "Fraunces", Georgia, serif;
+  --font-hand: "Caveat", "Fraunces", cursive;
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", "Helvetica Neue", Arial, sans-serif;
   --radius-sm: 4px;
   --radius-md: 6px;
+  --radius-lg: 8px;
   --theme-overlay: none;
   --italic-emphasis: 1;
+
+  /* Spacing scale (the only allowed gaps/paddings) */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --s-8: 64px;
+
+  /* Paper grain — barely perceptible noise overlay */
+  --paper-grain-url: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.07 0 0 0 0 0.06 0 0 0 0 0.05 0 0 0 0.55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --paper-grain-opacity: 0.035;
 }
 
 /* -------- Theme: Editorial (default) -------- */
@@ -23,9 +40,9 @@ html.theme-editorial, :root {
   --bg-pressed: #efe6d2;
   --bg-done: #f4e9d4;
 
-  --text: #1f1610;
-  --text-muted: #7a5a3a;
-  --text-faint: #aa8c66;
+  --text: #13110d;
+  --text-muted: #6a4a2e;
+  --text-faint: #a07c54;
 
   --brass: #b8956a;
   --brass-deep: #9d7b54;
@@ -56,9 +73,9 @@ html.theme-watercolor {
   --bg-pressed: #ecdfcc;
   --bg-done: #efdcc8;
 
-  --text: #3a2920;
-  --text-muted: #7a5a48;
-  --text-faint: #b39378;
+  --text: #251913;
+  --text-muted: #6b4a38;
+  --text-faint: #a4836a;
 
   --brass: #d4a08a;
   --brass-deep: #b87b65;
@@ -95,9 +112,9 @@ html.theme-dark {
   --bg-pressed: #2c241d;
   --bg-done: #2f2418;
 
-  --text: #f0e8dc;
-  --text-muted: #c9b69a;
-  --text-faint: #8c785e;
+  --text: #faf3e6;
+  --text-muted: #d7c4a4;
+  --text-faint: #9e8868;
 
   --brass: #c8b58a;
   --brass-deep: #b8956a;
@@ -2759,3 +2776,543 @@ em, i, .login-sub, .partner-time, .countdown-label, .countdown-when,
   pointer-events: none;
 }
 .quick-log-btn { position: relative; }
+
+/* =====================================================================
+   POLISH V2 — Contrast, spacing, motion, photography, masthead, polaroids
+   Layered after the base so it deliberately overrides earlier declarations.
+   ===================================================================== */
+
+/* ---- Paper grain overlay (barely visible texture) ---- */
+body { position: relative; }
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: var(--paper-grain-url);
+  background-size: 240px 240px;
+  background-repeat: repeat;
+  opacity: var(--paper-grain-opacity);
+  pointer-events: none;
+  z-index: 0;
+  mix-blend-mode: multiply;
+}
+html.theme-dark body::before { mix-blend-mode: screen; opacity: 0.025; }
+.screen, .tab-pane, .app-header, .tabs, #toast, .settings-overlay,
+.photo-modal, .photo-viewer { position: relative; z-index: 1; }
+
+/* ---- Names always italic (Fraunces) wherever they appear ---- */
+.who-btn span[data-name],
+[data-name],
+.name { font-style: italic; font-family: var(--font-serif); }
+
+/* ---- Phosphor icon defaults ---- */
+.ph-thin, [class*="ph-thin"] { font-style: normal; line-height: 1; }
+
+/* Habit-card icon (replaces emoji visual) */
+.qlog-icon {
+  font-size: 22px;
+  color: var(--text);
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.qlog-emoji { display: none !important; }
+.quick-log-btn.done .qlog-icon { color: var(--brass-deep); }
+
+/* Header icon buttons get phosphor-shaped centering */
+.thinking-heart .ph-thin,
+.settings-btn .ph-thin,
+.notif-banner-dismiss .ph-thin,
+.viewer-close .ph-thin,
+.viewer-nav .ph-thin,
+.settings-close .ph-thin,
+.settings-section-chev.ph-thin {
+  font-size: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.settings-section-chev.ph-thin { font-size: 14px; color: var(--text-muted); transition: transform 180ms ease; }
+.settings-section.open .settings-section-chev.ph-thin { transform: rotate(90deg); }
+.thinking-heart .ph-heart { font-size: 22px; }
+.photo-fab-plus.ph-plus { font-size: 26px; }
+.denied-mark .ph-warning { font-size: 56px; color: var(--brass-deep); }
+.photos-empty-heart .ph-thin { font-size: 36px; color: var(--brass); }
+
+/* Hide brass-on-cream weak contrasts: brass is non-text only */
+.muted, .day-meta, .partner-time, .login-date,
+.section-title-text, .sub, .qlog-meta, .qlog-streak {
+  color: var(--text-muted);
+}
+.hero-line { color: var(--text); }
+.hero-line .hero-num { color: var(--text); }
+
+/* ---- Postmark date treatment ---- */
+.postmark {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 10px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-variation-settings: "opsz" 14;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  white-space: nowrap;
+}
+.postmark::before,
+.postmark::after {
+  content: "";
+  display: inline-block;
+  width: 18px;
+  height: 1px;
+  background: var(--brass);
+  opacity: 0.7;
+}
+.postmark.postmark-bare::before,
+.postmark.postmark-bare::after { display: none; }
+
+/* ---- Login background photo + overlay ---- */
+#login-screen { position: relative; overflow: hidden; }
+.login-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(20px) saturate(0.95);
+  transform: scale(1.08);
+  opacity: 0;
+  transition: opacity 600ms ease;
+  z-index: 0;
+  pointer-events: none;
+}
+.login-bg.loaded { opacity: 1; }
+.login-bg-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(244, 237, 224, 0.78);
+  z-index: 0;
+  pointer-events: none;
+}
+html.theme-dark .login-bg-overlay { background: rgba(28, 23, 20, 0.72); }
+.login-box { position: relative; z-index: 1; }
+
+/* Sharper login mono on cream */
+.login-mono { color: var(--text); font-variation-settings: "opsz" 144, "SOFT" 100, "WONK" 0; }
+.login-date.postmark { margin-top: var(--s-7); }
+.login-date.postmark::before,
+.login-date.postmark::after { width: 28px; }
+
+/* ---- Today masthead (Newspaper) ---- */
+.today-masthead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-5) var(--s-5) 0 var(--s-5);
+}
+.masthead-rule {
+  height: 1px;
+  background: var(--brass);
+  width: 100%;
+  opacity: 0.85;
+}
+.masthead-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--s-2) 0;
+  gap: var(--s-4);
+}
+.masthead-date { font-size: 10px; }
+.masthead-date::before,
+.masthead-date::after { display: none; }
+.masthead-title {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 14px;
+  color: var(--text-muted);
+  letter-spacing: 0.2px;
+}
+
+/* Lead-story dividers framing the visit countdown / habits */
+.lead-divider {
+  height: 1px;
+  background: var(--brass);
+  opacity: 0.6;
+  margin: var(--s-6) var(--s-5) var(--s-5) var(--s-5);
+}
+.lead-divider-top { margin-top: var(--s-5); }
+.habits-section-title { padding: 0 var(--s-5); margin-bottom: var(--s-4); }
+.habits-section-title .section-title-text { letter-spacing: 3px; }
+
+/* ---- Today hero photo strip ---- */
+.today-hero-photo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: var(--s-5) var(--s-5) 0 var(--s-5);
+}
+.today-hero-photo.hidden { display: none; }
+.today-hero-photo-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 7;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--bg-elevated);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+.today-hero-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.today-hero-cap {
+  font-family: var(--font-serif-italic);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 0 var(--s-1);
+}
+
+/* ---- Greeting drop-cap + serif hero ---- */
+.today-greeting {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 32px;
+  line-height: 1.15;
+  letter-spacing: -0.3px;
+  color: var(--text);
+  padding: var(--s-5) var(--s-5) var(--s-2) var(--s-5);
+  animation: fadeUp 600ms ease both;
+}
+.today-greeting .drop-cap {
+  font-size: 80px;
+  line-height: 0.85;
+  color: var(--brass-deep);
+  float: left;
+  font-weight: 300;
+  padding-right: var(--s-3);
+  padding-top: 4px;
+  font-variation-settings: "opsz" 144, "SOFT" 100;
+  animation: dropCapIn 600ms ease both;
+}
+.hero-line {
+  padding: 0 var(--s-5);
+  color: var(--text);
+  font-size: 15px;
+}
+.today-date-line { padding: 0 var(--s-5) var(--s-2) var(--s-5); }
+.today-date.postmark::before,
+.today-date.postmark::after { width: 22px; }
+
+/* Watercolor wash behind the visit countdown number */
+.visit-banner,
+#visit-banner {
+  position: relative;
+}
+#visit-banner.visit-banner:not(.hidden)::before {
+  content: "";
+  position: absolute;
+  inset: -10px -20px;
+  background: radial-gradient(circle at 30% 50%, rgba(184, 149, 106, 0.22), transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+  border-radius: 50%;
+}
+html.theme-watercolor #visit-banner.visit-banner:not(.hidden)::before {
+  background: radial-gradient(circle at 30% 50%, rgba(212, 160, 138, 0.22), transparent 70%);
+}
+html.theme-dark #visit-banner.visit-banner:not(.hidden)::before {
+  background: radial-gradient(circle at 30% 50%, rgba(200, 181, 138, 0.18), transparent 70%);
+}
+#visit-banner .visit-eyebrow-wrap,
+#visit-banner .visit-meta { position: relative; z-index: 1; }
+
+/* Pin the giant visit count to baseline */
+.visit-count {
+  font-family: var(--font-serif);
+  font-weight: 300;
+  font-size: 120px;
+  line-height: 0.95;
+  letter-spacing: -4px;
+  color: var(--text);
+  font-variation-settings: "opsz" 144, "SOFT" 100;
+  display: block;
+  text-align: center;
+}
+
+/* ---- Polaroid photo grid in Us tab ---- */
+.photo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-flow: row dense;
+  gap: var(--s-4);
+  padding: var(--s-3) var(--s-1);
+}
+.photo-grid .photo-card {
+  position: relative;
+  background: #fbf7ee;
+  border: 1px solid rgba(31, 17, 13, 0.08);
+  padding: var(--s-3) var(--s-3) var(--s-4) var(--s-3);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  border-radius: var(--radius-sm);
+  transform: rotate(0deg);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+html.theme-dark .photo-grid .photo-card {
+  background: #2a221c;
+  border-color: rgba(244, 237, 224, 0.10);
+}
+.photo-grid .photo-card:nth-child(odd) { transform: rotate(-0.5deg); }
+.photo-grid .photo-card:nth-child(even) { transform: rotate(0.5deg); }
+.photo-grid .photo-card:hover { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08); }
+.photo-grid .photo-card:active { transform: scale(0.985); }
+
+/* Varied layout — every 4th = full-row hero (16:10), every 8th = full-row */
+.photo-grid .photo-card:nth-child(4n+1) { grid-column: 1 / -1; }
+.photo-grid .photo-card:nth-child(4n+1) .photo-card-img-wrap { aspect-ratio: 16 / 10; }
+.photo-grid .photo-card:nth-child(4n+1):nth-child(odd) { transform: rotate(-0.25deg); }
+.photo-grid .photo-card:nth-child(8n+4) { grid-column: 1 / -1; }
+.photo-grid .photo-card:nth-child(8n+4) .photo-card-img-wrap { aspect-ratio: 4 / 3; }
+
+.photo-grid .photo-card-img-wrap {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  background: var(--bg-pressed);
+  border-radius: 2px;
+}
+.photo-grid .photo-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.photo-grid .photo-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding: 0 var(--s-1);
+}
+.photo-grid .photo-card-caption {
+  font-family: var(--font-hand);
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 1.2;
+  color: #3a2920;
+  font-style: italic;
+}
+html.theme-dark .photo-grid .photo-card-caption { color: #f3e8d5; }
+.photo-grid .photo-card-caption.empty {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.photo-grid .photo-card-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: var(--font-serif);
+  letter-spacing: 0.4px;
+}
+.photo-grid .photo-card-meta .by {
+  font-style: italic;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+}
+.photo-grid .photo-card-meta .by-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--brass);
+  display: inline-block;
+}
+
+/* Month divider: torn-paper SVG */
+.photo-month-header {
+  position: relative;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 24px;
+  color: var(--text);
+  padding: var(--s-7) var(--s-5) var(--s-3) var(--s-5);
+  margin-top: var(--s-4);
+}
+.photo-month-header::before {
+  content: "";
+  position: absolute;
+  left: var(--s-5);
+  right: var(--s-5);
+  top: var(--s-4);
+  height: 8px;
+  background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='8' viewBox='0 0 400 8' preserveAspectRatio='none'%3E%3Cpath d='M0 4 Q 12 2 24 4 T 48 4 T 72 5 T 96 3 T 120 4 T 144 4 T 168 5 T 192 3 T 216 4 T 240 4 T 264 5 T 288 3 T 312 4 T 336 4 T 360 5 T 384 3 L400 4' stroke='%23b8956a' stroke-width='1' fill='none' opacity='0.65'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: 100% 8px;
+  pointer-events: none;
+}
+.photo-month { padding-bottom: var(--s-5); }
+
+/* ---- Photo card on Us tab — gracefully degrade for empty captions ---- */
+.photos-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--s-7) var(--s-5);
+  gap: var(--s-3);
+  min-height: 40vh;
+}
+.photos-empty-text {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  color: var(--text);
+}
+.photos-empty-sub {
+  font-family: var(--font-serif-italic);
+  font-style: italic;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+/* ---- Spacing audit — symmetric padding inside cards/sections ---- */
+.section-title { padding: 0 var(--s-5); margin-top: var(--s-5); margin-bottom: var(--s-3); }
+.section-divider { margin: var(--s-6) var(--s-5); }
+.tab-pane { padding-bottom: var(--s-7); }
+.app-header { padding: var(--s-3) var(--s-5); gap: var(--s-3); align-items: center; }
+.header-left { align-items: center; gap: var(--s-3); }
+.header-right { align-items: center; gap: var(--s-2); }
+.tabs { padding: 0 var(--s-5); }
+.tabs-inner { gap: var(--s-3); }
+.person-toggle { gap: var(--s-2); padding: var(--s-3) var(--s-5); }
+
+/* Settings overlay — uniform section headers + inputs */
+.settings-section-header {
+  padding: var(--s-4) var(--s-5);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.settings-section-body { padding: var(--s-3) var(--s-5) var(--s-5) var(--s-5); }
+.settings-subheader-actions { padding: var(--s-2) 0; gap: var(--s-2); display: flex; }
+.settings-add-btn { margin-top: var(--s-3); padding: var(--s-3) var(--s-4); }
+.settings-app-row, .settings-theme-row { padding: var(--s-3) 0; gap: var(--s-3); }
+.settings-input,
+.settings-input.emoji,
+input[type="text"].settings-input,
+input.settings-input { padding: var(--s-2) var(--s-3); }
+
+/* Empty-state generic */
+.empty-state-block {
+  text-align: center;
+  padding: var(--s-7) var(--s-5);
+}
+
+/* ---- Italic-emphasis classes (Cormorant Garamond) ---- */
+.italic-emph,
+.photo-card-caption.italic-emph,
+#ci-gratitude,
+.about-me-field,
+.photos-empty-sub {
+  font-family: var(--font-serif-italic);
+  font-style: italic;
+}
+
+/* ---- Motion: tab pane transitions ---- */
+.tab-pane { transition: opacity 180ms ease, transform 180ms ease; }
+.tab-pane.pane-leave {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.tab-pane.pane-enter {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+.tab-pane.pane-enter-active,
+.tab-pane.active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Soft scale on tap, applied broadly */
+button:active,
+.who-btn:active,
+.tab-btn:active,
+.quick-log-btn:active,
+.photo-card:active,
+.person-btn:active,
+.settings-tab:active {
+  transform: scale(0.97);
+  transition: transform 120ms ease;
+}
+
+/* Sync dot pulse when syncing */
+.sync-dot[data-state="syncing"] {
+  animation: syncPulse 1s ease infinite;
+}
+@keyframes syncPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.55; transform: scale(1.25); }
+}
+
+/* Habit-card stagger fade-in (set via inline style index in JS) */
+.quick-log-btn {
+  animation: cardFadeIn 360ms ease both;
+  animation-delay: calc(var(--card-i, 0) * 40ms);
+}
+@keyframes cardFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes dropCapIn {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Newspaper "Today's lead" eyebrow */
+.lead-eyebrow {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--brass-deep);
+  display: block;
+  text-align: center;
+  padding: var(--s-2) 0;
+}
+
+/* ---- Theme tweaks ---- */
+html.theme-dark .qlog-icon { color: var(--text); }
+html.theme-dark .quick-log-btn.done .qlog-icon { color: var(--brass); }
+html.theme-dark .photo-grid .photo-card { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.30); }
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
