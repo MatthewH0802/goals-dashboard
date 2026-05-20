@@ -131,7 +131,8 @@ let state = {
   qIndex: 0
 };
 
-let currentUser = localStorage.getItem("mm-user") || null;
+// Always require an explicit pick on every app open (no auto-login).
+let currentUser = null;
 let currentUid = null;
 let currentOutcomeView = "matthew";
 let currentHabitView = "matthew";
