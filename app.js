@@ -40,8 +40,143 @@ let _lastPingAt = 0;             // for the 30s client-side throttle on the hear
 const DEFAULT_START_DATE = "2026-05-18";
 
 const DEFAULT_PROFILES = {
-  matthew: { displayName: "Matthew", color: "#000000" },
-  marie:   { displayName: "Marie",   color: "#000000" }
+  matthew: {
+    displayName: "Matthew",
+    color: "#b8956a",
+    avatarUrl: "",
+    birthday: "",
+    anniversary: "",
+    timezone: "America/Los_Angeles",
+    aboutMe: "",
+    favorites: {},
+    importantPeople: []
+  },
+  marie: {
+    displayName: "Marie",
+    color: "#b8956a",
+    avatarUrl: "",
+    birthday: "",
+    anniversary: "",
+    timezone: "America/New_York",
+    aboutMe: "",
+    favorites: {},
+    importantPeople: []
+  }
+};
+
+const CURRENT_SCHEMA_VERSION = 2;
+const DEFAULT_THEME = "editorial";
+const VALID_THEMES = ["editorial", "watercolor", "dark"];
+const COMMON_TIMEZONES = [
+  { id: "America/Los_Angeles", label: "PST — Los Angeles" },
+  { id: "America/Denver",      label: "MST — Denver" },
+  { id: "America/Chicago",     label: "CST — Chicago" },
+  { id: "America/New_York",    label: "EST — New York" },
+  { id: "Europe/London",       label: "GMT — London" },
+  { id: "Europe/Paris",        label: "CET — Paris" }
+];
+
+// ---- Habit / Goals / Standards templates (Settings → Templates) ---------
+const HABIT_TEMPLATE_PACKS = {
+  shared: [
+    {
+      id: "orthodox", title: "Orthodox practice",
+      sectionDefault: "mind",
+      items: [
+        { emoji: "🙏", name: "Agpeya 1st hour", target: "Daily",   section: "mind" },
+        { emoji: "🙏", name: "Agpeya 3rd hour", target: "Daily",   section: "mind" },
+        { emoji: "🙏", name: "Agpeya 6th hour", target: "Daily",   section: "mind" },
+        { emoji: "🙏", name: "Agpeya 9th hour", target: "Daily",   section: "mind" },
+        { emoji: "📖", name: "Synaxarium reading", target: "Daily", section: "mind" },
+        { emoji: "⛪", name: "Sunday liturgy", target: "Weekly",   section: "mind" },
+        { emoji: "✝️", name: "Communion",      target: "4x/month", section: "mind" },
+        { emoji: "🙏", name: "Confession",     target: "Monthly",  section: "mind" },
+        { emoji: "🕊️", name: "Pray together",  target: "Sat night", section: "together" }
+      ]
+    },
+    {
+      id: "relationship", title: "Relationship",
+      sectionDefault: "together",
+      items: [
+        { emoji: "💬", name: "Call partner",      target: "Daily",     section: "together" },
+        { emoji: "💖", name: "Date night",        target: "2x/month",  section: "together" },
+        { emoji: "🎬", name: "Watch together",    target: "Nightly",   section: "together" },
+        { emoji: "💌", name: "Send love note",    target: "Weekly",    section: "together" },
+        { emoji: "📅", name: "Plan next visit",   target: "Weekly",    section: "together" }
+      ]
+    }
+  ],
+  marie: [
+    {
+      id: "dental", title: "Dental school",
+      sectionDefault: "mind",
+      items: [
+        { emoji: "📚", name: "Study 2h",              target: "Daily",    section: "mind" },
+        { emoji: "🦷", name: "Anki review",           target: "Daily",    section: "mind" },
+        { emoji: "🩺", name: "Clinical practice",     target: "3x/week",  section: "body" },
+        { emoji: "📝", name: "Patient notes review",  target: "Daily",    section: "mind" },
+        { emoji: "🔬", name: "Lab work",              target: "3x/week",  section: "body" }
+      ]
+    }
+  ],
+  matthew: []
+};
+
+const GOAL_TEMPLATE_PACKS = {
+  shared: [
+    {
+      id: "spiritual", title: "Spiritual growth",
+      items: [
+        { cat: "spiritual", name: "Finish a spiritual book", target: "Quarterly" },
+        { cat: "spiritual", name: "Memorize a psalm",         target: "Monthly" },
+        { cat: "spiritual", name: "Attend retreat",           target: "Once this year" }
+      ]
+    }
+  ],
+  matthew: [
+    {
+      id: "career", title: "Career milestones",
+      items: [
+        { cat: "career", name: "Quarterly review with mentor", target: "End of Q" },
+        { cat: "career", name: "Publish a thought-piece",      target: "Monthly" },
+        { cat: "career", name: "Reach next title",             target: "12 months" }
+      ]
+    }
+  ],
+  marie: [
+    {
+      id: "health", title: "Health",
+      items: [
+        { cat: "health", name: "Hit lifting PR",       target: "End of quarter" },
+        { cat: "health", name: "Cook 5 meals/week",    target: "Weekly" },
+        { cat: "health", name: "Annual physical",      target: "By Dec 31" }
+      ]
+    }
+  ]
+};
+
+const STANDARD_TEMPLATE_PACKS = {
+  marie: [
+    {
+      id: "common-she", title: "Common standards (her)",
+      items: [
+        { name: "Mindful of tone & delivery", ctx: "How she says things" },
+        { name: "Lovingly direct",            ctx: "Straightforward, not hinting" },
+        { name: "No absolutes",               ctx: "No 'never' or 'always'" },
+        { name: "Love through actions",       ctx: "Not only words" }
+      ]
+    }
+  ],
+  matthew: [
+    {
+      id: "common-he", title: "Common standards (him)",
+      items: [
+        { name: "Takes concerns seriously", ctx: "Doesn't dismiss" },
+        { name: "Calm voice",               ctx: "Especially during tension" },
+        { name: "Asks her questions",       ctx: "Learning about her" }
+      ]
+    }
+  ]
 };
 
 const DEFAULT_VISITS = {
@@ -153,7 +288,7 @@ const DEFAULT_QUESTIONS = {
 
 // ---- Runtime config (mirrors Firestore /config/*) ------------------------
 let config = {
-  app:            { startDate: DEFAULT_START_DATE, schemaVersion: 0 },
+  app:            { startDate: DEFAULT_START_DATE, schemaVersion: 0, theme: DEFAULT_THEME },
   profiles:       JSON.parse(JSON.stringify(DEFAULT_PROFILES)),
   habits:         JSON.parse(JSON.stringify(DEFAULT_HABITS)),
   habit_sections: JSON.parse(JSON.stringify(DEFAULT_HABIT_SECTIONS)),
@@ -243,11 +378,59 @@ function getStreak(habitId) {
   return streak;
 }
 
+// ---- Sync dot state machine --------------------------------------------
+//
+// Old API: setSyncStatus("synced" | "syncing" | "offline"). The element used
+// to be a pill at the bottom of the screen with literal text; it's now a tiny
+// dot in the header right side. An "offline" label flashes briefly when the
+// state transitions to offline.
+let _syncOfflineLabelTimer = null;
 function setSyncStatus(status) {
-  const el = document.getElementById("sync-indicator");
-  if (!el) return;
-  el.textContent = status;
-  el.classList.toggle("syncing", status === "syncing");
+  const dot = document.getElementById("sync-dot");
+  const lbl = document.getElementById("sync-offline-label");
+  // Keep the legacy element working for safety, but never re-render its text.
+  const legacy = document.getElementById("sync-indicator");
+  if (legacy) {
+    legacy.classList.toggle("syncing", status === "syncing");
+    legacy.textContent = "";
+  }
+  if (!dot) return;
+  const valid = (status === "syncing" || status === "offline") ? status : "synced";
+  dot.setAttribute("data-state", valid);
+  dot.setAttribute("aria-label",
+    valid === "syncing" ? "Syncing" : valid === "offline" ? "Offline" : "Synced");
+  if (lbl) {
+    if (valid === "offline") {
+      lbl.classList.remove("hidden");
+      clearTimeout(_syncOfflineLabelTimer);
+      _syncOfflineLabelTimer = setTimeout(() => {
+        lbl.classList.add("hidden");
+      }, 3000);
+    } else if (valid === "synced") {
+      clearTimeout(_syncOfflineLabelTimer);
+      lbl.classList.add("hidden");
+    }
+  }
+}
+
+// ---- Theme application --------------------------------------------------
+function applyTheme(theme) {
+  const html = document.documentElement;
+  const next = VALID_THEMES.includes(theme) ? theme : DEFAULT_THEME;
+  VALID_THEMES.forEach(t => html.classList.toggle("theme-" + t, t === next));
+  // Update theme-color meta so the iOS status bar tint matches.
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) {
+    const map = { editorial: "#f4ede0", watercolor: "#faf3eb", dark: "#1c1714" };
+    meta.setAttribute("content", map[next] || "#f4ede0");
+  }
+  // Highlight the picker card if it's mounted.
+  document.querySelectorAll(".theme-card").forEach(card => {
+    const active = card.dataset.theme === next;
+    card.classList.toggle("is-active", active);
+    const inp = card.querySelector('input[type="radio"]');
+    if (inp) inp.checked = active;
+  });
 }
 
 function showToast(msg, kind) {
@@ -299,9 +482,43 @@ async function seedConfigIfMissing() {
   try {
     const appRef = doc(db, "config", "app");
     const snap = await getDoc(appRef);
-    if (snap.exists()) return false;
+    if (snap.exists()) {
+      // Migrate v1 -> v2: add `theme` field if absent, bump schemaVersion.
+      const data = snap.data() || {};
+      const needsThemeField = !data.theme || !VALID_THEMES.includes(data.theme);
+      const needsVersionBump = (data.schemaVersion || 0) < CURRENT_SCHEMA_VERSION;
+      if (needsThemeField || needsVersionBump) {
+        const patch = {};
+        if (needsThemeField)   patch.theme = DEFAULT_THEME;
+        if (needsVersionBump)  patch.schemaVersion = CURRENT_SCHEMA_VERSION;
+        try {
+          await setDoc(appRef, patch, { merge: true });
+          console.log("Migrated config/app to schemaVersion " + CURRENT_SCHEMA_VERSION);
+        } catch (e) {
+          console.warn("Migration write failed (non-fatal):", e);
+        }
+      }
+      // Best-effort: backfill missing profile fields on existing profile doc.
+      try {
+        const pRef = doc(db, "config", "profiles");
+        const pSnap = await getDoc(pRef);
+        if (pSnap.exists()) {
+          const cur = pSnap.data() || {};
+          const merged = mergeProfilesWithDefaults(cur);
+          if (profilesNeedBackfill(cur, merged)) {
+            await setDoc(pRef, merged, { merge: false });
+            console.log("Backfilled config/profiles with new schema fields.");
+          }
+        }
+      } catch (e) { console.warn("Profiles backfill failed (non-fatal):", e); }
+      return false;
+    }
     const batch = writeBatch(db);
-    batch.set(doc(db, "config", "app"),            { startDate: DEFAULT_START_DATE, schemaVersion: 1 });
+    batch.set(doc(db, "config", "app"), {
+      startDate: DEFAULT_START_DATE,
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      theme: DEFAULT_THEME
+    });
     batch.set(doc(db, "config", "profiles"),       DEFAULT_PROFILES);
     batch.set(doc(db, "config", "habits"),         DEFAULT_HABITS);
     batch.set(doc(db, "config", "habit_sections"), DEFAULT_HABIT_SECTIONS);
@@ -310,12 +527,36 @@ async function seedConfigIfMissing() {
     batch.set(doc(db, "config", "questions"),      DEFAULT_QUESTIONS);
     batch.set(doc(db, "config", "visits"),         DEFAULT_VISITS);
     await batch.commit();
-    console.log("Config seeded.");
+    console.log("Config seeded (schemaVersion " + CURRENT_SCHEMA_VERSION + ").");
     return true;
   } catch (e) {
     console.error("Config seed failed:", e);
     return false;
   }
+}
+
+function mergeProfilesWithDefaults(cur) {
+  const out = {};
+  ["matthew","marie"].forEach(role => {
+    const d = DEFAULT_PROFILES[role];
+    const c = (cur && cur[role]) || {};
+    out[role] = {
+      displayName:     c.displayName     || d.displayName,
+      color:           c.color           || d.color,
+      avatarUrl:       c.avatarUrl       || d.avatarUrl,
+      birthday:        c.birthday        || d.birthday,
+      anniversary:     c.anniversary     || d.anniversary,
+      timezone:        c.timezone        || d.timezone,
+      aboutMe:         c.aboutMe         || d.aboutMe,
+      favorites:       (c.favorites && typeof c.favorites === "object") ? c.favorites : { ...d.favorites },
+      importantPeople: Array.isArray(c.importantPeople) ? c.importantPeople : [...d.importantPeople]
+    };
+  });
+  return out;
+}
+function profilesNeedBackfill(cur, merged) {
+  try { return JSON.stringify(cur || {}) !== JSON.stringify(merged); }
+  catch (_) { return true; }
 }
 
 const CONFIG_DOCS = ["app","profiles","habits","habit_sections","outcomes","standards","questions","visits"];
@@ -329,6 +570,10 @@ function subscribeConfig() {
     const unsub = onSnapshot(ref, (snap) => {
       if (!snap.exists()) return;
       config[name] = snap.data();
+      // Theme: respond live whenever /config/app changes.
+      if (name === "app") {
+        applyTheme((config.app && config.app.theme) || DEFAULT_THEME);
+      }
       // Rerender if app is up
       if (currentUser) renderAll();
       const overlay = document.getElementById("settings-overlay");
@@ -415,6 +660,7 @@ async function showApp() {
 
   renderAll();
   startPresence();
+  startPartnerTimeTicker();
   ensureAuthAndPhotos();
 
   // Notifications: wait a couple seconds after the dashboard renders before
@@ -549,12 +795,127 @@ function applyNameLabels() {
 function renderAll() {
   applyNameLabels();
   renderHeader();
+  renderTodayCountdowns();
   renderToday();
   renderHabitsWeek();
   renderOutcomes();
   renderStandards();
   renderCheckin();
   renderUs();
+}
+
+// ---- Partner local time (every minute refresh) -------------------------
+let _partnerTimeTicker = null;
+function renderPartnerTime() {
+  const el = document.getElementById("partner-time");
+  if (!el) return;
+  if (!currentUser) { el.classList.add("hidden"); el.textContent = ""; return; }
+  const partner = currentUser === "matthew" ? "marie" : "matthew";
+  const p = (config.profiles && config.profiles[partner]) || {};
+  const tz = p.timezone;
+  const name = profileName(partner);
+  if (!tz) { el.classList.add("hidden"); el.textContent = ""; return; }
+  let timeStr = "";
+  try {
+    timeStr = new Intl.DateTimeFormat("en-US", {
+      hour: "numeric", minute: "2-digit", timeZone: tz
+    }).format(new Date());
+  } catch (_) { el.classList.add("hidden"); el.textContent = ""; return; }
+  el.classList.remove("hidden");
+  el.textContent = `${name} ${timeStr}`;
+}
+function startPartnerTimeTicker() {
+  if (_partnerTimeTicker) return;
+  // Align to top of next minute, then tick every 60s.
+  const now = new Date();
+  const msToNextMinute = 60000 - (now.getSeconds() * 1000 + now.getMilliseconds());
+  setTimeout(() => {
+    renderPartnerTime();
+    _partnerTimeTicker = setInterval(renderPartnerTime, 60000);
+  }, Math.max(500, msToNextMinute));
+}
+
+// ---- Today auto-countdowns (60-day window) -----------------------------
+// Stack of up to 3 rows: birthdays, anniversary, important people.
+function _daysUntil(monthDay) {
+  if (!monthDay) return null;
+  // monthDay is "MM-DD" or "YYYY-MM-DD"
+  const parts = monthDay.split("-").map(Number);
+  let m, d;
+  if (parts.length === 3) { m = parts[1]; d = parts[2]; }
+  else if (parts.length === 2) { m = parts[0]; d = parts[1]; }
+  else return null;
+  if (!m || !d) return null;
+  const today = new Date();
+  const yy = today.getFullYear();
+  let target = new Date(yy, m - 1, d);
+  // If today is past this year's date, roll to next year.
+  const todayMidnight = new Date(yy, today.getMonth(), today.getDate());
+  if (target < todayMidnight) target = new Date(yy + 1, m - 1, d);
+  return Math.round((target - todayMidnight) / 86400000);
+}
+
+function renderTodayCountdowns() {
+  const el = document.getElementById("today-countdowns");
+  if (!el || !currentUser) { if (el) el.innerHTML = ""; return; }
+  const profiles = config.profiles || {};
+  const rows = [];
+
+  ["matthew","marie"].forEach(role => {
+    const p = profiles[role] || {};
+    if (p.birthday) {
+      const days = _daysUntil(p.birthday);
+      if (days != null && days <= 60 && days >= 0) {
+        rows.push({
+          label: (p.displayName || role) + "'s birthday",
+          days
+        });
+      }
+    }
+  });
+
+  // Anniversary (shared — same date stored on both; read from current user
+  // and fall back to partner if absent).
+  const meAnn  = profiles[currentUser] && profiles[currentUser].anniversary;
+  const partner = currentUser === "matthew" ? "marie" : "matthew";
+  const partnerAnn = profiles[partner] && profiles[partner].anniversary;
+  const annStr = meAnn || partnerAnn;
+  if (annStr) {
+    const days = _daysUntil(annStr);
+    if (days != null && days <= 60 && days >= 0) {
+      rows.push({ label: "Anniversary", days });
+    }
+  }
+
+  // Important people from both profiles
+  ["matthew","marie"].forEach(role => {
+    const list = (profiles[role] && profiles[role].importantPeople) || [];
+    list.forEach(person => {
+      if (!person || !person.birthday) return;
+      const days = _daysUntil(person.birthday);
+      if (days == null || days > 60 || days < 0) return;
+      const rel = person.relation ? ` (${person.relation})` : "";
+      rows.push({ label: `${person.name || "Someone"}${rel}'s birthday`, days });
+    });
+  });
+
+  // Sort by soonest, cap at 3.
+  rows.sort((a, b) => a.days - b.days);
+  const display = rows.slice(0, 3);
+  if (!display.length) { el.innerHTML = ""; return; }
+
+  el.innerHTML = display.map(r => {
+    const inText = r.days === 0
+      ? "today"
+      : r.days === 1
+        ? "in 1 day"
+        : "in " + r.days + " days";
+    return `<div class="countdown-row">
+      <span class="countdown-dot" aria-hidden="true"></span>
+      <span class="countdown-label">${escapeHtml(r.label)}</span>
+      <span class="countdown-when">${escapeHtml(inText)}</span>
+    </div>`;
+  }).join("");
 }
 
 function formatVisitRange(v) {
@@ -589,6 +950,22 @@ function renderHeader() {
   } else {
     dayEl.textContent = "Day " + (daysBetween(sd, today) + 1);
   }
+
+  // Avatar in header
+  const avatarEl = document.getElementById("current-user-avatar");
+  if (avatarEl && currentUser) {
+    const p = (config.profiles && config.profiles[currentUser]) || {};
+    if (p.avatarUrl) {
+      avatarEl.style.backgroundImage = `url("${p.avatarUrl}")`;
+      avatarEl.textContent = "";
+    } else {
+      avatarEl.style.backgroundImage = "none";
+      avatarEl.textContent = (p.displayName || currentUser).charAt(0).toUpperCase();
+    }
+  }
+
+  // Partner local time (refreshed every minute via _startPartnerTimeTicker())
+  renderPartnerTime();
 
   const banner = document.getElementById("visit-banner");
   const v = pickActiveVisit(today);
@@ -648,7 +1025,18 @@ function habitCardHtml(h, today, locked) {
   const k = today + "_" + h.id;
   const done = state.habitLog[k] === "done";
   const streak = getStreak(h.id);
-  return `<button class="quick-log-btn ${done ? "done" : ""}" data-habit="${h.id}" ${locked ? "disabled" : ""}>
+  // Attribution dot: who logged it today? Uses current user's avatar if done.
+  let attr = "";
+  if (done && currentUser) {
+    const p = (config.profiles && config.profiles[currentUser]) || {};
+    if (p.avatarUrl) {
+      attr = `<span class="qlog-attr" style="background-image:url('${escapeHtml(p.avatarUrl)}')"></span>`;
+    } else {
+      attr = `<span class="qlog-attr"></span>`;
+    }
+  }
+  return `<button class="quick-log-btn ${done ? "done" : ""}" data-habit="${h.id}" ${locked ? "disabled" : ""} title="${escapeHtml(h.name || "")}">
+    ${attr}
     <span class="qlog-emoji">${h.emoji || ""}</span>
     <span class="qlog-check">✓</span>
     ${streak > 0 ? `<span class="qlog-streak">${streak} day${streak === 1 ? "" : "s"}</span>` : ""}
@@ -1230,41 +1618,297 @@ function renderSettings() {
   renderSettingsApp();
 }
 
-// Profiles
+// Profiles — full form per person
 function renderSettingsProfiles() {
   const container = document.getElementById("settings-profiles");
   if (!container) return;
-  const profiles = config.profiles || {};
-  const roles = ["matthew", "marie"];
-  container.innerHTML = roles.map(role => {
-    const p = profiles[role] || {};
-    return `<div class="settings-profile-row" data-role="${role}">
-      <div class="settings-profile-role">${role.charAt(0).toUpperCase() + role.slice(1)}</div>
-      <input class="settings-profile-name" type="text" data-field="displayName" value="${escapeHtml(p.displayName || "")}" placeholder="Display name">
-      <input class="settings-input" type="color" data-field="color" value="${escapeHtml(p.color || "#000000")}" title="Color" style="width:42px;padding:4px;">
-    </div>`;
-  }).join("");
-  container.querySelectorAll(".settings-profile-row").forEach(row => {
-    const role = row.dataset.role;
-    row.querySelectorAll("input").forEach(inp => {
+  const profiles = mergeProfilesWithDefaults(config.profiles || {});
+  // Keep runtime config in sync so reads use the merged shape.
+  config.profiles = profiles;
+  container.innerHTML = `<div class="profiles-grid">
+    ${["matthew","marie"].map(role => profileFormHtml(role, profiles[role])).join("")}
+  </div>`;
+
+  container.querySelectorAll(".profile-form").forEach(form => {
+    const role = form.dataset.role;
+
+    // Avatar tile → opens avatar picker
+    const tile = form.querySelector(".profile-avatar-tile");
+    if (tile) tile.addEventListener("click", () => openAvatarPicker(role));
+
+    // Simple text/date/select fields
+    form.querySelectorAll("[data-field]").forEach(inp => {
       const commit = async () => {
+        const field = inp.dataset.field;
+        let value = inp.value;
+        if (field === "aboutMe") value = (value || "").slice(0, 500);
         const next = { ...(config.profiles || {}) };
-        next[role] = { ...(next[role] || {}), [inp.dataset.field]: inp.value };
+        next[role] = { ...(next[role] || {}), [field]: value };
+        // Mirror anniversary across both partners (one source of truth).
+        if (field === "anniversary") {
+          const other = role === "matthew" ? "marie" : "matthew";
+          next[other] = { ...(next[other] || {}), anniversary: value };
+        }
         const prev = config.profiles;
         config.profiles = next;
         applyNameLabels();
-        const ok = await patchConfigDoc("profiles", { [role]: next[role] });
+        renderHeader();
+        renderTodayCountdowns();
+        const ok = await patchConfigDoc("profiles", { [role]: next[role], ...(field === "anniversary" ? { [role === "matthew" ? "marie" : "matthew"]: next[role === "matthew" ? "marie" : "matthew"] } : {}) });
         if (!ok) {
           config.profiles = prev;
           applyNameLabels();
+          renderHeader();
           renderSettingsProfiles();
+        } else if (field === "aboutMe") {
+          // Live-update the character counter without re-rendering everything.
+          const counter = form.querySelector(".profile-char-count");
+          if (counter) counter.textContent = (value.length) + " / 500";
         }
       };
       inp.addEventListener("change", commit);
       inp.addEventListener("blur", commit);
-      inp.addEventListener("keydown", e => { if (e.key === "Enter") inp.blur(); });
+      if (inp.tagName === "TEXTAREA") {
+        inp.addEventListener("input", () => {
+          const counter = form.querySelector(".profile-char-count");
+          if (counter) counter.textContent = (inp.value.length) + " / 500";
+        });
+      }
+      inp.addEventListener("keydown", e => {
+        if (e.key === "Enter" && inp.tagName !== "TEXTAREA") inp.blur();
+      });
+    });
+
+    // Favorites: add/remove
+    const favList = form.querySelector(".profile-favorites");
+    const favAdd  = form.querySelector(".profile-add-favorite");
+    if (favAdd) {
+      favAdd.addEventListener("click", async () => {
+        const next = JSON.parse(JSON.stringify(config.profiles || {}));
+        const cur  = next[role] || {};
+        cur.favorites = cur.favorites || {};
+        let key = "new";
+        let i = 1;
+        while (Object.prototype.hasOwnProperty.call(cur.favorites, key)) {
+          key = "new" + (++i);
+        }
+        cur.favorites[key] = "";
+        next[role] = cur;
+        config.profiles = next;
+        renderSettingsProfiles();
+        await patchConfigDoc("profiles", { [role]: cur });
+      });
+    }
+    if (favList) favList.querySelectorAll(".profile-kv-row").forEach(row => {
+      const oldKey = row.dataset.key;
+      const keyEl  = row.querySelector(".kv-key");
+      const valEl  = row.querySelector(".kv-val");
+      const delBtn = row.querySelector(".profile-row-del");
+      const commit = async () => {
+        const next = JSON.parse(JSON.stringify(config.profiles || {}));
+        const cur  = next[role] || {};
+        cur.favorites = cur.favorites || {};
+        const newKey = (keyEl.value || "").trim() || oldKey;
+        const newVal = valEl.value || "";
+        if (newKey !== oldKey) delete cur.favorites[oldKey];
+        cur.favorites[newKey] = newVal;
+        next[role] = cur;
+        config.profiles = next;
+        await patchConfigDoc("profiles", { [role]: cur });
+      };
+      keyEl && keyEl.addEventListener("blur", commit);
+      valEl && valEl.addEventListener("blur", commit);
+      delBtn && delBtn.addEventListener("click", async () => {
+        const next = JSON.parse(JSON.stringify(config.profiles || {}));
+        const cur  = next[role] || {};
+        cur.favorites = cur.favorites || {};
+        delete cur.favorites[oldKey];
+        next[role] = cur;
+        config.profiles = next;
+        renderSettingsProfiles();
+        await patchConfigDoc("profiles", { [role]: cur });
+      });
+    });
+
+    // Important people
+    const pplList = form.querySelector(".profile-people");
+    const pplAdd  = form.querySelector(".profile-add-person");
+    if (pplAdd) {
+      pplAdd.addEventListener("click", async () => {
+        const next = JSON.parse(JSON.stringify(config.profiles || {}));
+        const cur  = next[role] || {};
+        cur.importantPeople = Array.isArray(cur.importantPeople) ? cur.importantPeople : [];
+        cur.importantPeople.push({ name: "", relation: "", birthday: "" });
+        next[role] = cur;
+        config.profiles = next;
+        renderSettingsProfiles();
+        await patchConfigDoc("profiles", { [role]: cur });
+      });
+    }
+    if (pplList) pplList.querySelectorAll(".profile-person-row").forEach(row => {
+      const idx = parseInt(row.dataset.idx, 10);
+      const inputs = row.querySelectorAll("input");
+      const delBtn = row.querySelector(".profile-row-del");
+      const commit = async () => {
+        const next = JSON.parse(JSON.stringify(config.profiles || {}));
+        const cur  = next[role] || {};
+        cur.importantPeople = Array.isArray(cur.importantPeople) ? cur.importantPeople : [];
+        if (!cur.importantPeople[idx]) return;
+        cur.importantPeople[idx] = {
+          name:     inputs[0].value,
+          relation: inputs[1].value,
+          birthday: inputs[2].value
+        };
+        next[role] = cur;
+        config.profiles = next;
+        renderTodayCountdowns();
+        await patchConfigDoc("profiles", { [role]: cur });
+      };
+      inputs.forEach(i => i.addEventListener("blur", commit));
+      delBtn && delBtn.addEventListener("click", async () => {
+        const next = JSON.parse(JSON.stringify(config.profiles || {}));
+        const cur  = next[role] || {};
+        cur.importantPeople = Array.isArray(cur.importantPeople) ? cur.importantPeople : [];
+        cur.importantPeople.splice(idx, 1);
+        next[role] = cur;
+        config.profiles = next;
+        renderSettingsProfiles();
+        renderTodayCountdowns();
+        await patchConfigDoc("profiles", { [role]: cur });
+      });
     });
   });
+}
+
+function profileFormHtml(role, p) {
+  const initial = (p.displayName || role).charAt(0).toUpperCase();
+  const avatarStyle = p.avatarUrl
+    ? `background-image:url('${escapeHtml(p.avatarUrl)}')`
+    : "";
+  const tzOptions = COMMON_TIMEZONES.map(tz =>
+    `<option value="${escapeHtml(tz.id)}" ${p.timezone === tz.id ? "selected" : ""}>${escapeHtml(tz.label)}</option>`
+  ).join("");
+  const favEntries = Object.entries(p.favorites || {});
+  const peopleList = Array.isArray(p.importantPeople) ? p.importantPeople : [];
+  const aboutLen = (p.aboutMe || "").length;
+
+  return `<div class="profile-form" data-role="${role}">
+    <div class="profile-form-header">
+      <button type="button" class="profile-avatar-tile" style="${avatarStyle}" aria-label="Change ${role} avatar">${p.avatarUrl ? "" : escapeHtml(initial)}</button>
+      <div class="profile-form-header-text">
+        <div class="profile-form-role">${role}</div>
+        <input class="profile-form-name" type="text" data-field="displayName" value="${escapeHtml(p.displayName || "")}" placeholder="Display name" maxlength="40">
+      </div>
+    </div>
+    <div class="profile-fields">
+      <div>
+        <label class="profile-field-label">Birthday</label>
+        <input class="profile-field-input" type="date" data-field="birthday" value="${escapeHtml(p.birthday || "")}">
+      </div>
+      <div>
+        <label class="profile-field-label">Anniversary</label>
+        <input class="profile-field-input" type="date" data-field="anniversary" value="${escapeHtml(p.anniversary || "")}">
+      </div>
+      <div class="profile-field-full">
+        <label class="profile-field-label">Timezone</label>
+        <select class="profile-field-select" data-field="timezone">
+          <option value="">— pick one —</option>
+          ${tzOptions}
+        </select>
+      </div>
+      <div class="profile-field-full">
+        <label class="profile-field-label">About me</label>
+        <textarea class="profile-field-textarea" data-field="aboutMe" maxlength="500" rows="3" placeholder="A few sentences…">${escapeHtml(p.aboutMe || "")}</textarea>
+        <span class="profile-char-count">${aboutLen} / 500</span>
+      </div>
+
+      <div class="profile-subsection">
+        <div class="profile-subsection-title">Favorites</div>
+        <div class="profile-favorites">
+          ${favEntries.map(([k, v]) => `<div class="profile-kv-row" data-key="${escapeHtml(k)}">
+            <input class="kv-key" type="text" value="${escapeHtml(k)}" placeholder="key (e.g. flower)">
+            <input class="kv-val" type="text" value="${escapeHtml(v || "")}" placeholder="value">
+            <button type="button" class="profile-row-del" aria-label="Remove">×</button>
+          </div>`).join("")}
+        </div>
+        <button type="button" class="profile-add-row profile-add-favorite">+ Add favorite</button>
+      </div>
+
+      <div class="profile-subsection">
+        <div class="profile-subsection-title">Important people</div>
+        <div class="profile-people">
+          ${peopleList.map((person, i) => `<div class="profile-person-row" data-idx="${i}">
+            <input type="text" value="${escapeHtml(person.name || "")}" placeholder="Name">
+            <input type="text" value="${escapeHtml(person.relation || "")}" placeholder="Relation">
+            <input type="date" value="${escapeHtml(person.birthday || "")}" placeholder="Birthday">
+            <button type="button" class="profile-row-del" aria-label="Remove">×</button>
+          </div>`).join("")}
+        </div>
+        <button type="button" class="profile-add-row profile-add-person">+ Add person</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// Avatar upload — reuses the existing canvas resize, writes to a stable per-role
+// path, then patches profiles[role].avatarUrl.
+let _pendingAvatarRole = null;
+function openAvatarPicker(role) {
+  if (!currentUid) { showToast("Signing in… try again in a moment."); ensureAuthAndPhotos(); return; }
+  _pendingAvatarRole = role;
+  const input = document.getElementById("avatar-file-input");
+  if (!input) return;
+  input.value = "";
+  input.click();
+}
+async function onAvatarFilePicked(file) {
+  const role = _pendingAvatarRole;
+  if (!file || !role) return;
+  const tile = document.querySelector(`.profile-form[data-role="${role}"] .profile-avatar-tile`);
+  if (tile) tile.classList.add("uploading");
+  setSyncStatus("syncing");
+  try {
+    // Square 400x400 JPEG at 0.85
+    const blob = await resizeImageToSquareBlob(file, 400, 0.85);
+    const path = `photos/profile/${role}.jpg`;
+    const ref = storageRef(storage, path);
+    await uploadBytes(ref, blob, { contentType: "image/jpeg" });
+    const url = await getDownloadURL(ref);
+    const next = JSON.parse(JSON.stringify(config.profiles || {}));
+    next[role] = next[role] || {};
+    next[role].avatarUrl = url;
+    config.profiles = next;
+    await patchConfigDoc("profiles", { [role]: next[role] });
+    renderHeader();
+    renderSettingsProfiles();
+    setSyncStatus("synced");
+    showToast("Avatar updated.");
+  } catch (e) {
+    console.error("Avatar upload failed:", e);
+    setSyncStatus("offline");
+    showToast("Avatar upload failed.", "error");
+  } finally {
+    if (tile) tile.classList.remove("uploading");
+    _pendingAvatarRole = null;
+  }
+}
+
+// Square crop + resize for avatars. Reuses the same canvas + dataUrl pattern
+// as resizeImageToBlob (defined later in the file).
+async function resizeImageToSquareBlob(file, size = 400, quality = 0.85) {
+  const dataUrl = await readFileAsDataUrl(file);
+  const img = await loadImage(dataUrl);
+  const side = Math.min(img.width, img.height);
+  const sx = Math.floor((img.width - side) / 2);
+  const sy = Math.floor((img.height - side) / 2);
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
+  const blob = await new Promise(res => canvas.toBlob(res, "image/jpeg", quality));
+  if (!blob) throw new Error("Resize failed");
+  return blob;
 }
 
 // Visits
@@ -1330,6 +1974,7 @@ function renderSettingsVisits() {
       }
     });
   });
+  decorateSettingsSection("visits");
 }
 
 async function addVisit() {
@@ -1453,6 +2098,8 @@ function renderSettingsHabits() {
       }
     });
   });
+  decorateSettingsSection("habits");
+  renderTemplatePanel("habits");
 }
 
 async function addHabit() {
@@ -1551,6 +2198,8 @@ function renderSettingsGoals() {
       }
     });
   });
+  decorateSettingsSection("goals");
+  renderTemplatePanel("goals");
 }
 
 async function addGoal() {
@@ -1635,6 +2284,8 @@ function renderSettingsStandards() {
       }
     });
   });
+  decorateSettingsSection("standards");
+  renderTemplatePanel("standards");
 }
 
 async function addStandard() {
@@ -1699,6 +2350,7 @@ function renderSettingsQuestions() {
       }
     });
   });
+  decorateSettingsSection("questions");
 }
 
 async function addQuestion() {
@@ -1711,6 +2363,362 @@ async function addQuestion() {
   if (!ok) {
     config.questions = prev;
     renderSettingsQuestions();
+  }
+}
+
+// ---- Edit mode, drag-to-reorder, templates, theme picker ----------------
+
+// Section -> { isEditing: bool, openTemplate: bool, selected: Set<idx> }
+let settingsBulkState = {
+  habits:    { isEditing: false, openTemplate: false, selected: new Set() },
+  goals:     { isEditing: false, openTemplate: false, selected: new Set() },
+  standards: { isEditing: false, openTemplate: false, selected: new Set() },
+  questions: { isEditing: false,                       selected: new Set() },
+  visits:    { isEditing: false,                       selected: new Set() }
+};
+
+function getCurrentSectionRole(section) {
+  switch (section) {
+    case "habits":    return settingsState.habitsTab;
+    case "goals":     return settingsState.goalsTab;
+    case "standards": return settingsState.standardsTab;
+    default:          return "shared";
+  }
+}
+
+function readSectionList(section) {
+  if (section === "habits") {
+    return (config.habits && config.habits[settingsState.habitsTab]) || [];
+  }
+  if (section === "goals") {
+    return (config.outcomes && config.outcomes[settingsState.goalsTab]) || [];
+  }
+  if (section === "standards") {
+    return (config.standards && config.standards[settingsState.standardsTab]) || [];
+  }
+  if (section === "questions") {
+    return (config.questions && config.questions.items) || [];
+  }
+  if (section === "visits") {
+    return (config.visits && config.visits.items) || [];
+  }
+  return [];
+}
+
+async function writeSectionList(section, list) {
+  if (section === "habits") {
+    const role = settingsState.habitsTab;
+    const next = { ...(config.habits || {}), [role]: list };
+    config.habits = next;
+    return saveConfigDoc("habits", next);
+  }
+  if (section === "goals") {
+    const role = settingsState.goalsTab;
+    const next = { ...(config.outcomes || {}), [role]: list };
+    config.outcomes = next;
+    return saveConfigDoc("outcomes", next);
+  }
+  if (section === "standards") {
+    const role = settingsState.standardsTab;
+    const next = { ...(config.standards || {}), [role]: list };
+    config.standards = next;
+    return saveConfigDoc("standards", next);
+  }
+  if (section === "questions") {
+    config.questions = { items: list };
+    return saveConfigDoc("questions", { items: list });
+  }
+  if (section === "visits") {
+    config.visits = { items: list };
+    return saveConfigDoc("visits", { items: list });
+  }
+  return false;
+}
+
+function rerenderSection(section) {
+  if (section === "habits")    return renderSettingsHabits();
+  if (section === "goals")     return renderSettingsGoals();
+  if (section === "standards") return renderSettingsStandards();
+  if (section === "questions") return renderSettingsQuestions();
+  if (section === "visits")    return renderSettingsVisits();
+}
+
+// Decoration: walks .settings-card elements and injects drag-handles +
+// (when in edit mode) checkboxes. Wires drag/drop + selection toggles.
+function decorateSettingsSection(section) {
+  const bulk = settingsBulkState[section];
+  if (!bulk) return;
+  const containerId = ({
+    habits: "settings-habits",
+    goals: "settings-goals",
+    standards: "settings-standards",
+    questions: "settings-questions",
+    visits: "settings-visits"
+  })[section];
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  // Mark wrapper for edit-mode CSS scoping.
+  const wrapper = container.closest(".settings-section");
+  if (wrapper) wrapper.classList.toggle("in-edit", !!bulk.isEditing);
+
+  const cards = Array.from(container.querySelectorAll(".settings-card, .settings-question-row"));
+  cards.forEach((card, idx) => {
+    // Inject drag handle (once)
+    if (!card.querySelector(".drag-handle")) {
+      const h = document.createElement("span");
+      h.className = "drag-handle";
+      h.textContent = "⋮⋮"; // ⋮⋮
+      h.setAttribute("draggable", "true");
+      h.setAttribute("aria-label", "Drag to reorder");
+      card.insertBefore(h, card.firstChild);
+    }
+    card.setAttribute("data-idx", String(idx));
+
+    // Edit-mode: inject checkbox
+    let check = card.querySelector(".bulk-checkbox");
+    if (bulk.isEditing) {
+      if (!check) {
+        check = document.createElement("input");
+        check.type = "checkbox";
+        check.className = "bulk-checkbox";
+        check.addEventListener("click", e => e.stopPropagation());
+        check.addEventListener("change", () => {
+          if (check.checked) bulk.selected.add(idx);
+          else bulk.selected.delete(idx);
+          renderBulkBar(section);
+        });
+        // After the drag handle.
+        const h = card.querySelector(".drag-handle");
+        card.insertBefore(check, h ? h.nextSibling : card.firstChild);
+      }
+      check.checked = bulk.selected.has(idx);
+    } else if (check) {
+      check.remove();
+    }
+  });
+
+  // Drag & drop
+  attachDragDrop(container, section);
+
+  // Render bulk bar
+  renderBulkBar(section);
+}
+
+function attachDragDrop(container, section) {
+  let dragIdx = null;
+  let dragCard = null;
+
+  container.querySelectorAll(".settings-card, .settings-question-row").forEach(card => {
+    const handle = card.querySelector(".drag-handle");
+    if (!handle) return;
+
+    // Only the handle starts a drag.
+    handle.addEventListener("dragstart", (e) => {
+      dragIdx = parseInt(card.dataset.idx, 10);
+      dragCard = card;
+      card.classList.add("dragging");
+      try {
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", String(dragIdx));
+      } catch (_) {}
+    });
+    handle.addEventListener("dragend", () => {
+      if (dragCard) dragCard.classList.remove("dragging");
+      container.querySelectorAll(".drop-above, .drop-below").forEach(el => {
+        el.classList.remove("drop-above", "drop-below");
+      });
+      dragIdx = null;
+      dragCard = null;
+    });
+
+    card.addEventListener("dragover", (e) => {
+      if (dragIdx == null) return;
+      e.preventDefault();
+      const rect = card.getBoundingClientRect();
+      const above = (e.clientY - rect.top) < (rect.height / 2);
+      card.classList.toggle("drop-above", above);
+      card.classList.toggle("drop-below", !above);
+    });
+    card.addEventListener("dragleave", () => {
+      card.classList.remove("drop-above", "drop-below");
+    });
+    card.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      if (dragIdx == null) return;
+      const targetIdx = parseInt(card.dataset.idx, 10);
+      if (targetIdx === dragIdx) return;
+      const rect = card.getBoundingClientRect();
+      const above = (e.clientY - rect.top) < (rect.height / 2);
+      const list = readSectionList(section).slice();
+      const [item] = list.splice(dragIdx, 1);
+      let insertAt = targetIdx;
+      if (dragIdx < targetIdx) insertAt = above ? targetIdx - 1 : targetIdx;
+      else                     insertAt = above ? targetIdx : targetIdx + 1;
+      list.splice(insertAt, 0, item);
+      // Reset selection — indices shift.
+      settingsBulkState[section] && settingsBulkState[section].selected.clear();
+      await writeSectionList(section, list);
+      rerenderSection(section);
+    });
+  });
+}
+
+function renderBulkBar(section) {
+  const bar = document.querySelector(`.bulk-bar[data-bulk="${section}"]`);
+  if (!bar) return;
+  const bulk = settingsBulkState[section];
+  if (!bulk || !bulk.isEditing) {
+    bar.classList.add("hidden");
+    bar.innerHTML = "";
+    return;
+  }
+  const n = bulk.selected.size;
+  bar.classList.remove("hidden");
+  bar.innerHTML = `<span><em>${n}</em> selected</span>
+    <div class="row" style="display:flex;gap:8px;">
+      <button type="button" class="bulk-bar-cancel">Done</button>
+      <button type="button" class="bulk-bar-delete" ${n === 0 ? "disabled" : ""}>Delete ${n}</button>
+    </div>`;
+  const cancel = bar.querySelector(".bulk-bar-cancel");
+  if (cancel) cancel.addEventListener("click", () => {
+    bulk.isEditing = false;
+    bulk.selected.clear();
+    rerenderSection(section);
+  });
+  const del = bar.querySelector(".bulk-bar-delete");
+  if (del) del.addEventListener("click", async () => {
+    if (n === 0) return;
+    if (!confirm(`Delete ${n} selected item${n === 1 ? "" : "s"}?`)) return;
+    const list = readSectionList(section).slice();
+    const idxs = Array.from(bulk.selected).sort((a, b) => b - a);
+    idxs.forEach(i => list.splice(i, 1));
+    bulk.selected.clear();
+    bulk.isEditing = false;
+    await writeSectionList(section, list);
+    rerenderSection(section);
+  });
+}
+
+// Template packs
+function templateItemsFor(section, role) {
+  if (section === "habits")    return HABIT_TEMPLATE_PACKS[role]    || [];
+  if (section === "goals")     return GOAL_TEMPLATE_PACKS[role]     || [];
+  if (section === "standards") return STANDARD_TEMPLATE_PACKS[role] || [];
+  return [];
+}
+
+function renderTemplatePanel(section) {
+  const panel = document.querySelector(`[data-template-panel="${section}"]`);
+  if (!panel) return;
+  const bulk = settingsBulkState[section];
+  if (!bulk || !bulk.openTemplate) {
+    panel.classList.add("hidden");
+    panel.innerHTML = "";
+    return;
+  }
+  const role = getCurrentSectionRole(section);
+  const packs = templateItemsFor(section, role);
+  if (!packs.length) {
+    panel.classList.remove("hidden");
+    panel.innerHTML = `<p class="settings-empty">No templates for this section yet.</p>`;
+    return;
+  }
+  panel.classList.remove("hidden");
+  panel.innerHTML = packs.map(pack => `<div class="template-pack" data-pack="${escapeHtml(pack.id)}">
+    <div class="template-pack-title">${escapeHtml(pack.title)}</div>
+    <div class="template-pack-items">
+      ${pack.items.map((it, i) => {
+        const emoji = it.emoji ? `<span class="template-item-emoji">${escapeHtml(it.emoji)}</span>` : "";
+        const meta = it.target || it.cat || it.ctx || "";
+        return `<label class="template-item">
+          <input type="checkbox" data-pack="${escapeHtml(pack.id)}" data-i="${i}">
+          ${emoji}
+          <span>${escapeHtml(it.name)}</span>
+          ${meta ? `<span class="template-item-meta">${escapeHtml(meta)}</span>` : ""}
+        </label>`;
+      }).join("")}
+    </div>
+  </div>`).join("") + `<div class="template-actions">
+    <button type="button" class="template-cancel-btn">Cancel</button>
+    <button type="button" class="template-add-btn" disabled>Add selected</button>
+  </div>`;
+
+  const addBtn    = panel.querySelector(".template-add-btn");
+  const cancelBtn = panel.querySelector(".template-cancel-btn");
+  const checkBoxes = panel.querySelectorAll('input[type="checkbox"]');
+  const updateAdd = () => {
+    const any = Array.from(checkBoxes).some(c => c.checked);
+    addBtn.disabled = !any;
+  };
+  checkBoxes.forEach(c => c.addEventListener("change", updateAdd));
+  if (cancelBtn) cancelBtn.addEventListener("click", () => {
+    bulk.openTemplate = false;
+    renderTemplatePanel(section);
+  });
+  if (addBtn) addBtn.addEventListener("click", async () => {
+    const chosen = [];
+    Array.from(checkBoxes).forEach(c => {
+      if (!c.checked) return;
+      const packId = c.dataset.pack;
+      const i = parseInt(c.dataset.i, 10);
+      const pack = packs.find(p => p.id === packId);
+      if (pack && pack.items[i]) chosen.push(pack.items[i]);
+    });
+    if (!chosen.length) return;
+    await addTemplatesToSection(section, role, chosen);
+    bulk.openTemplate = false;
+    rerenderSection(section);
+  });
+}
+
+async function addTemplatesToSection(section, role, items) {
+  if (section === "habits") {
+    const existing = (config.habits && config.habits[role]) || [];
+    const prefix = role === "matthew" ? "mw" : role === "marie" ? "mr" : "sh";
+    const newHabits = items.map(it => ({
+      id: uid(prefix), name: it.name, emoji: it.emoji || "✨", target: it.target || "Daily"
+    }));
+    const nextHabits = { ...(config.habits || {}), [role]: existing.concat(newHabits) };
+    const sections = JSON.parse(JSON.stringify(config.habit_sections || DEFAULT_HABIT_SECTIONS));
+    ["body","mind","together"].forEach(k => {
+      sections[k] = sections[k] || { title: k, ids: [] };
+    });
+    newHabits.forEach((h, i) => {
+      const sec = items[i].section || "body";
+      sections[sec].ids.push(h.id);
+    });
+    config.habits = nextHabits;
+    config.habit_sections = sections;
+    await saveConfigDoc("habits", nextHabits);
+    await saveConfigDoc("habit_sections", sections);
+    showToast("Added " + newHabits.length + " habit" + (newHabits.length === 1 ? "" : "s") + ".");
+    return;
+  }
+  if (section === "goals") {
+    const existing = (config.outcomes && config.outcomes[role]) || [];
+    const prefix = role === "matthew" ? "mw" : role === "marie" ? "mr" : "sh";
+    const newGoals = items.map(it => ({
+      id: uid(prefix), cat: it.cat || "personal",
+      name: it.name, target: it.target || "TBD", focus: false
+    }));
+    const next = { ...(config.outcomes || {}), [role]: existing.concat(newGoals) };
+    config.outcomes = next;
+    await saveConfigDoc("outcomes", next);
+    showToast("Added " + newGoals.length + " goal" + (newGoals.length === 1 ? "" : "s") + ".");
+    return;
+  }
+  if (section === "standards") {
+    const existing = (config.standards && config.standards[role]) || [];
+    const prefix = role === "marie" ? "s-mr" : "s-mw";
+    const newStds = items.map(it => ({
+      id: uid(prefix), name: it.name, ctx: it.ctx || ""
+    }));
+    const next = { ...(config.standards || {}), [role]: existing.concat(newStds) };
+    config.standards = next;
+    await saveConfigDoc("standards", next);
+    showToast("Added " + newStds.length + " standard" + (newStds.length === 1 ? "" : "s") + ".");
+    return;
   }
 }
 
@@ -1745,6 +2753,29 @@ function renderSettingsApp() {
     sd.addEventListener("change", commit);
     sd.addEventListener("blur", commit);
   }
+
+  // Theme picker — paint current selection + wire click handlers. The
+  // <div class="theme-picker"> lives inside the settings overlay markup,
+  // not inside #settings-app, so this is idempotent on re-render.
+  applyTheme((config.app && config.app.theme) || DEFAULT_THEME);
+  document.querySelectorAll(".theme-card").forEach(card => {
+    if (card._wired) return;
+    card._wired = true;
+    card.addEventListener("click", async (e) => {
+      e.preventDefault();
+      const theme = card.dataset.theme;
+      if (!VALID_THEMES.includes(theme)) return;
+      applyTheme(theme);
+      const next = { ...(config.app || {}), theme };
+      const prev = config.app;
+      config.app = next;
+      const ok = await patchConfigDoc("app", { theme });
+      if (!ok) {
+        config.app = prev;
+        applyTheme((config.app && config.app.theme) || DEFAULT_THEME);
+      }
+    });
+  });
 }
 
 async function resetDefaults() {
@@ -1910,6 +2941,10 @@ async function sendThinkingPing() {
 
 ready(() => {
   console.log("M&M app initializing");
+
+  // Apply the locally-known theme immediately for first paint. Once config
+  // subscriptions resolve, applyTheme() will be re-called with the live value.
+  applyTheme((config.app && config.app.theme) || DEFAULT_THEME);
 
   // Bootstrap order matters: sign in anonymously FIRST. We DO NOT subscribe to
   // Firestore here — security rules now require an allowlisted UID for every
@@ -2124,6 +3159,45 @@ ready(() => {
       else if (kind === "question") addQuestion();
     });
   });
+
+  // Template buttons — open inline pack picker for the section.
+  document.querySelectorAll('[data-template]').forEach(b => {
+    if (b._wired) return;
+    b._wired = true;
+    b.addEventListener("click", () => {
+      const section = b.dataset.template;
+      const bulk = settingsBulkState[section];
+      if (!bulk) return;
+      bulk.openTemplate = !bulk.openTemplate;
+      b.classList.toggle("is-active", bulk.openTemplate);
+      renderTemplatePanel(section);
+    });
+  });
+
+  // Edit (bulk-mode) buttons.
+  document.querySelectorAll('[data-edit]').forEach(b => {
+    if (b._wired) return;
+    b._wired = true;
+    b.addEventListener("click", () => {
+      const section = b.dataset.edit;
+      const bulk = settingsBulkState[section];
+      if (!bulk) return;
+      bulk.isEditing = !bulk.isEditing;
+      if (!bulk.isEditing) bulk.selected.clear();
+      b.classList.toggle("is-active", bulk.isEditing);
+      rerenderSection(section);
+    });
+  });
+
+  // Avatar file input — completes the avatar upload flow opened from the
+  // profile tile (see openAvatarPicker()).
+  const avatarInput = document.getElementById("avatar-file-input");
+  if (avatarInput) {
+    avatarInput.addEventListener("change", (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) onAvatarFilePicked(file);
+    });
+  }
 
   const resetBtn = document.getElementById("settings-reset-defaults");
   if (resetBtn) resetBtn.addEventListener("click", resetDefaults);

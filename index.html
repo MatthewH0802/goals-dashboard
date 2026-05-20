@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="theme-editorial">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
@@ -48,11 +48,19 @@
   <div id="app-screen" class="screen">
     <header class="app-header">
       <div class="header-left">
-        <span id="current-user" class="user-name"></span>
-        <span id="day-counter" class="day-meta">Day 1</span>
+        <span id="current-user-avatar" class="header-avatar" aria-hidden="true"></span>
+        <div class="header-id">
+          <span id="current-user" class="user-name"></span>
+          <span class="header-meta-line">
+            <span id="day-counter" class="day-meta">Day 1</span>
+            <span id="partner-time" class="partner-time hidden"></span>
+          </span>
+        </div>
         <span id="partner-presence" class="partner-presence hidden"></span>
       </div>
       <div class="header-right">
+        <span id="sync-dot" class="sync-dot" data-state="synced" aria-label="Synced" title="Synced"></span>
+        <span id="sync-offline-label" class="sync-offline-label hidden">offline</span>
         <button id="thinking-heart" class="thinking-heart" aria-label="Send a thinking-of-you ping" title="Thinking of you">&#10084;</button>
         <button id="open-settings" class="settings-btn" aria-label="Settings" title="Settings">&#9881;</button>
         <button id="switch-user" class="switch-btn">switch</button>
@@ -60,6 +68,7 @@
     </header>
 
     <div id="visit-banner" class="visit-banner hidden"></div>
+    <div id="today-countdowns" class="countdown-stack" aria-live="polite"></div>
     <div id="notif-banner" class="notif-banner hidden">
       <span class="notif-banner-text">Turn on notifications to get pings from your partner.</span>
       <button id="notif-banner-retry" class="notif-banner-btn">Tap to retry</button>
@@ -107,6 +116,7 @@
       </button>
 
       <input id="photo-file-input" type="file" accept="image/*" capture="environment" class="visually-hidden">
+      <input id="avatar-file-input" type="file" accept="image/*" class="visually-hidden">
 
       <!-- Caption modal -->
       <div id="caption-modal" class="photo-modal hidden" role="dialog" aria-modal="true" aria-labelledby="caption-modal-title">
@@ -221,8 +231,6 @@
       </details>
     </section>
 
-    <div id="sync-indicator" class="sync-pill">synced</div>
-
     <!-- Toast for errors -->
     <div id="toast" class="toast hidden"></div>
 
@@ -253,7 +261,11 @@
             <span class="settings-section-chev">&#9656;</span>
           </button>
           <div class="settings-section-body" data-body="visits">
+            <div class="settings-subheader-actions">
+              <button class="btn-quiet edit-btn" data-edit="visits">Edit</button>
+            </div>
             <div id="settings-visits"></div>
+            <div class="bulk-bar hidden" data-bulk="visits"></div>
             <button class="settings-add-btn" data-add="visit">+ Add visit</button>
           </div>
         </section>
@@ -270,7 +282,13 @@
               <button class="settings-tab" data-habits-tab="marie" data-name="marie">Marie</button>
               <button class="settings-tab" data-habits-tab="shared">Shared</button>
             </div>
+            <div class="settings-subheader-actions">
+              <button class="btn-quiet template-btn" data-template="habits">Templates</button>
+              <button class="btn-quiet edit-btn" data-edit="habits">Edit</button>
+            </div>
+            <div class="template-panel hidden" data-template-panel="habits"></div>
             <div id="settings-habits"></div>
+            <div class="bulk-bar hidden" data-bulk="habits"></div>
             <button class="settings-add-btn" data-add="habit">+ Add habit</button>
           </div>
         </section>
@@ -287,7 +305,13 @@
               <button class="settings-tab" data-goals-tab="marie" data-name="marie">Marie</button>
               <button class="settings-tab" data-goals-tab="shared">Shared</button>
             </div>
+            <div class="settings-subheader-actions">
+              <button class="btn-quiet template-btn" data-template="goals">Templates</button>
+              <button class="btn-quiet edit-btn" data-edit="goals">Edit</button>
+            </div>
+            <div class="template-panel hidden" data-template-panel="goals"></div>
             <div id="settings-goals"></div>
+            <div class="bulk-bar hidden" data-bulk="goals"></div>
             <button class="settings-add-btn" data-add="goal">+ Add goal</button>
           </div>
         </section>
@@ -303,7 +327,13 @@
               <button class="settings-tab active" data-standards-tab="marie" data-name="marie">For Marie</button>
               <button class="settings-tab" data-standards-tab="matthew" data-name="matthew">For Matthew</button>
             </div>
+            <div class="settings-subheader-actions">
+              <button class="btn-quiet template-btn" data-template="standards">Templates</button>
+              <button class="btn-quiet edit-btn" data-edit="standards">Edit</button>
+            </div>
+            <div class="template-panel hidden" data-template-panel="standards"></div>
             <div id="settings-standards"></div>
+            <div class="bulk-bar hidden" data-bulk="standards"></div>
             <button class="settings-add-btn" data-add="standard">+ Add standard</button>
           </div>
         </section>
@@ -315,7 +345,11 @@
             <span class="settings-section-chev">&#9656;</span>
           </button>
           <div class="settings-section-body" data-body="questions">
+            <div class="settings-subheader-actions">
+              <button class="btn-quiet edit-btn" data-edit="questions">Edit</button>
+            </div>
             <div id="settings-questions"></div>
+            <div class="bulk-bar hidden" data-bulk="questions"></div>
             <button class="settings-add-btn" data-add="question">+ Add question</button>
           </div>
         </section>
@@ -328,6 +362,38 @@
           </button>
           <div class="settings-section-body" data-body="app">
             <div id="settings-app"></div>
+            <div class="settings-app-row settings-theme-row">
+              <span class="settings-label">Theme</span>
+              <div class="theme-picker" id="theme-picker">
+                <label class="theme-card" data-theme="editorial">
+                  <input type="radio" name="theme" value="editorial">
+                  <span class="theme-swatches">
+                    <span style="background:#f4ede0"></span>
+                    <span style="background:#b8956a"></span>
+                    <span style="background:#1f1610"></span>
+                  </span>
+                  <span class="theme-name">Editorial</span>
+                </label>
+                <label class="theme-card" data-theme="watercolor">
+                  <input type="radio" name="theme" value="watercolor">
+                  <span class="theme-swatches">
+                    <span style="background:#faf3eb"></span>
+                    <span style="background:#d4a08a"></span>
+                    <span style="background:#3a2920"></span>
+                  </span>
+                  <span class="theme-name">Watercolor</span>
+                </label>
+                <label class="theme-card" data-theme="dark">
+                  <input type="radio" name="theme" value="dark">
+                  <span class="theme-swatches">
+                    <span style="background:#1c1714"></span>
+                    <span style="background:#c8b58a"></span>
+                    <span style="background:#f0e8dc"></span>
+                  </span>
+                  <span class="theme-name">Dark</span>
+                </label>
+              </div>
+            </div>
           </div>
         </section>
 
