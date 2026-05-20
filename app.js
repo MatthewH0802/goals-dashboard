@@ -375,6 +375,10 @@ function showLogin() {
   document.getElementById("app-screen").classList.remove("active");
   const denied = document.getElementById("denied-screen");
   if (denied) denied.classList.remove("active");
+  const loginDate = document.getElementById("login-date");
+  if (loginDate) {
+    loginDate.textContent = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  }
 }
 
 function showAccessDenied() {
@@ -590,6 +594,7 @@ function renderHeader() {
   const v = pickActiveVisit(today);
   if (!v) {
     banner.classList.add("hidden");
+    banner.classList.remove("is-active");
     banner.innerHTML = "";
     return;
   }
@@ -600,19 +605,33 @@ function renderHeader() {
     : name;
   if (today >= v.start && today <= v.end) {
     banner.classList.remove("hidden");
-    banner.innerHTML = `<span class="visit-heart">❤</span>
-      <span class="visit-headline">${escapeHtml(partnerName)} is here</span>
-      <span class="visit-label">Book the next trip before she leaves</span>
-      <span class="visit-dates">${escapeHtml(range)}</span>`;
+    banner.classList.add("is-active");
+    banner.innerHTML = `
+      <div class="visit-eyebrow-wrap">
+        <span class="visit-rule" aria-hidden="true"></span>
+        <span class="visit-eyebrow">now</span>
+        <span class="visit-headline">${escapeHtml(partnerName)} is here</span>
+        <span class="visit-meta-label">Book the next trip before she leaves</span>
+        <span class="visit-dates">${escapeHtml(range)}</span>
+      </div>`;
   } else if (today < v.start) {
     const d = daysBetween(today, v.start);
     banner.classList.remove("hidden");
-    banner.innerHTML = `<span class="visit-heart">❤</span>
-      <span class="visit-count">${d}</span>
-      <span class="visit-label">${d === 1 ? "day" : "days"} until ${escapeHtml(name)}</span>
-      <span class="visit-dates">${escapeHtml(range)}</span>`;
+    banner.classList.remove("is-active");
+    banner.innerHTML = `
+      <div class="visit-eyebrow-wrap">
+        <span class="visit-rule" aria-hidden="true"></span>
+        <span class="visit-eyebrow">next visit</span>
+        <span class="visit-count">${d}</span>
+      </div>
+      <div class="visit-meta">
+        <span class="visit-meta-label">${d === 1 ? "day until" : "days until"}</span>
+        <span class="visit-meta-subject">${escapeHtml(name)}</span>
+        <span class="visit-dates">${escapeHtml(range)}</span>
+      </div>`;
   } else {
     banner.classList.add("hidden");
+    banner.classList.remove("is-active");
     banner.innerHTML = "";
   }
 }
@@ -638,9 +657,26 @@ function habitCardHtml(h, today, locked) {
   </button>`;
 }
 
+function renderGreeting() {
+  const el = document.getElementById("today-greeting");
+  if (!el) return;
+  const h = new Date().getHours();
+  let period = "morning";
+  if (h >= 5 && h < 12) period = "morning";
+  else if (h >= 12 && h < 17) period = "afternoon";
+  else if (h >= 17 && h < 22) period = "evening";
+  else period = "night";
+  const name = currentUser ? profileName(currentUser) : "";
+  const text = `Good ${period}, ${name}.`;
+  const first = text.charAt(0);
+  const rest = text.slice(1);
+  el.innerHTML = `<span class="drop-cap">${escapeHtml(first)}</span>${escapeHtml(rest)}`;
+}
+
 function renderToday() {
   const today = todayISO();
-  document.getElementById("today-date").textContent = new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+  renderGreeting();
+  document.getElementById("today-date").textContent = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
   const habits = config.habits || { matthew: [], marie: [], shared: [] };
   const myHabits = habits[currentUser] || [];
@@ -679,7 +715,7 @@ function renderToday() {
       hero.innerHTML = "";
     } else {
       hero.classList.remove("empty");
-      hero.innerHTML = `<strong>You: ${myDone}/${myTotal}</strong> &middot; ${escapeHtml(profileName(partner))}: ${partnerDone}/${partnerTotal}`;
+      hero.innerHTML = `<em>You</em> <span class="hero-num">${myDone}/${myTotal}</span> &middot; <em>${escapeHtml(profileName(partner))}</em> <span class="hero-num">${partnerDone}/${partnerTotal}</span>`;
     }
   }
 

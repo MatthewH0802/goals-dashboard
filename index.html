@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#000000">
+  <meta name="theme-color" content="#f4ede0">
   <title>M&M Goals</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -20,10 +20,14 @@
   <!-- Login screen -->
   <div id="login-screen" class="screen active">
     <div class="login-box">
-      <h1>M&M</h1>
-      <p class="login-sub">Goals Dashboard</p>
-      <button class="who-btn" data-user="matthew">I'm <span data-name="matthew">Matthew</span></button>
-      <button class="who-btn" data-user="marie">I'm <span data-name="marie">Marie</span></button>
+      <h1 class="login-mono">M&amp;M</h1>
+      <div class="login-rule" aria-hidden="true"></div>
+      <p class="login-sub">Goals dashboard</p>
+      <div class="login-buttons">
+        <button class="who-btn who-btn-primary" data-user="matthew">I&rsquo;m <span data-name="matthew">Matthew</span></button>
+        <button class="who-btn who-btn-secondary" data-user="marie">I&rsquo;m <span data-name="marie">Marie</span></button>
+      </div>
+      <p id="login-date" class="login-date"></p>
     </div>
   </div>
 
@@ -44,14 +48,14 @@
   <div id="app-screen" class="screen">
     <header class="app-header">
       <div class="header-left">
-        <span id="current-user" class="user-pill"></span>
-        <span id="day-counter" class="day-pill">Day 1</span>
+        <span id="current-user" class="user-name"></span>
+        <span id="day-counter" class="day-meta">Day 1</span>
         <span id="partner-presence" class="partner-presence hidden"></span>
-        <button id="thinking-heart" class="thinking-heart" aria-label="Send a thinking-of-you ping" title="Thinking of you">&#10084;</button>
       </div>
       <div class="header-right">
-        <button id="switch-user" class="switch-btn">switch</button>
+        <button id="thinking-heart" class="thinking-heart" aria-label="Send a thinking-of-you ping" title="Thinking of you">&#10084;</button>
         <button id="open-settings" class="settings-btn" aria-label="Settings" title="Settings">&#9881;</button>
+        <button id="switch-user" class="switch-btn">switch</button>
       </div>
     </header>
 
@@ -63,31 +67,37 @@
     </div>
 
     <nav class="tabs">
-      <button class="tab-btn active" data-tab="today">Today</button>
-      <button class="tab-btn" data-tab="us">Us</button>
-      <button class="tab-btn" data-tab="habits">Week</button>
-      <button class="tab-btn" data-tab="outcomes">Goals</button>
-      <button class="tab-btn" data-tab="standards">Standards</button>
-      <button class="tab-btn" data-tab="checkin">Check-in</button>
+      <div class="tabs-inner">
+        <button class="tab-btn active" data-tab="today">Today</button>
+        <button class="tab-btn" data-tab="us">Us</button>
+        <button class="tab-btn" data-tab="habits">Week</button>
+        <button class="tab-btn" data-tab="outcomes">Goals</button>
+        <button class="tab-btn" data-tab="standards">Standards</button>
+        <button class="tab-btn" data-tab="checkin">Check-in</button>
+      </div>
     </nav>
 
     <!-- Today tab: big quick-log buttons -->
     <section id="tab-today" class="tab-pane active">
-      <h2 class="section-title">Tap to log <span id="today-date" class="date-sub"></span></h2>
+      <div id="today-greeting" class="today-greeting"></div>
       <p id="hero-line" class="hero-line empty"></p>
+      <p class="today-date-line"><span id="today-date" class="today-date"></span></p>
       <div id="today-habits"></div>
 
       <div class="section-divider"></div>
-      <h2 class="section-title">Your top focus</h2>
+      <h2 class="section-title"><span class="section-title-text">Your top focus</span></h2>
       <div id="today-focus"></div>
     </section>
 
     <!-- Us tab: photos timeline -->
     <section id="tab-us" class="tab-pane">
-      <h2 class="section-title">Us <span class="date-sub">moments together</span></h2>
+      <h2 class="section-title"><span class="section-title-text">Us</span> <span class="date-sub">moments together</span></h2>
       <div id="photos-empty" class="photos-empty hidden">
-        <div class="photos-empty-heart">&#10084;</div>
-        <p class="photos-empty-text">No memories yet.<br>Tap + to add the first one.</p>
+        <div class="photos-empty-heart" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 12.572l-7.5 7.428l-7.5-7.428a5 5 0 1 1 7.5-6.566a5 5 0 1 1 7.5 6.572"/></svg>
+        </div>
+        <p class="photos-empty-text">No memories yet.</p>
+        <p class="photos-empty-sub">Tap + to add the first one.</p>
       </div>
       <div id="photos-timeline" class="photos-timeline"></div>
 
