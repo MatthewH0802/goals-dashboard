@@ -26,6 +26,19 @@
     </div>
   </div>
 
+  <!-- Access denied screen -->
+  <div id="denied-screen" class="screen">
+    <div class="denied-box">
+      <h1 class="denied-mark">&#9888;</h1>
+      <p class="denied-title">This device isn't authorized.</p>
+      <p class="denied-body">
+        The Matthew and Marie roles have both been claimed by other devices.
+        If this looks wrong, ask Matthew to reset your slot from his Settings &rarr; Danger Zone.
+      </p>
+      <button class="who-btn" id="denied-back">Back</button>
+    </div>
+  </div>
+
   <!-- Main app -->
   <div id="app-screen" class="screen">
     <header class="app-header">
@@ -310,6 +323,18 @@
           <div class="settings-section-body" data-body="danger">
             <button id="settings-reset-defaults" class="settings-danger-btn">Reset all habits &amp; goals to defaults</button>
             <p class="settings-help">This re-seeds Firestore from the built-in defaults. You will be asked to confirm.</p>
+
+            <div class="settings-danger-sub">
+              <div class="settings-danger-sub-title">Reset your role claim</div>
+              <p class="settings-help">
+                Releases the UID lock on a role so any device that taps &ldquo;I&rsquo;m &lt;name&gt;&rdquo;
+                next can take over. Use only if you lost your device or cleared storage.
+              </p>
+              <div class="settings-danger-row">
+                <button id="settings-reset-matthew" class="settings-danger-btn">Reset Matthew&rsquo;s slot</button>
+                <button id="settings-reset-marie" class="settings-danger-btn">Reset Marie&rsquo;s slot</button>
+              </div>
+            </div>
           </div>
         </section>
 

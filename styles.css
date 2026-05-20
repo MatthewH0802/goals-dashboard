@@ -1434,3 +1434,63 @@ summary {
   .app-header { padding: 0.75rem 1rem; }
   .switch-btn { padding: 4px 8px; }
 }
+
+/* ---- Access denied screen --------------------------------------------- */
+.denied-box {
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+  padding: 32px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.denied-mark {
+  font-family: "Fraunces", Georgia, serif;
+  font-weight: 300;
+  font-size: 68px;
+  line-height: 1;
+  color: var(--text-muted);
+  margin: 0;
+}
+.denied-title {
+  font-family: "Fraunces", Georgia, serif;
+  font-weight: 400;
+  font-size: 22px;
+  line-height: 1.3;
+  color: var(--text);
+  margin: 0;
+}
+.denied-body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  margin: 0 0 8px 0;
+}
+.denied-box .who-btn {
+  margin-top: 4px;
+}
+
+/* ---- Settings Danger Zone: role-claim reset sub-block ----------------- */
+.settings-danger-sub {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.settings-danger-sub-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.settings-danger-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.settings-danger-row .settings-danger-btn {
+  flex: 1;
+}

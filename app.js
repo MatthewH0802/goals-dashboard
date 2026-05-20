@@ -363,17 +363,95 @@ async function patchConfigDoc(name, patch) {
 function showLogin() {
   document.getElementById("login-screen").classList.add("active");
   document.getElementById("app-screen").classList.remove("active");
+  const denied = document.getElementById("denied-screen");
+  if (denied) denied.classList.remove("active");
 }
 
-function showApp() {
+function showAccessDenied() {
   document.getElementById("login-screen").classList.remove("active");
+  document.getElementById("app-screen").classList.remove("active");
+  const denied = document.getElementById("denied-screen");
+  if (denied) denied.classList.add("active");
+}
+
+// Set true the first time a successful claim resolves and we kick off
+// Firestore subscriptions. Subsequent calls to showApp() must NOT re-subscribe.
+let _dataBootstrapped = false;
+
+async function showApp() {
+  document.getElementById("login-screen").classList.remove("active");
+  const denied = document.getElementById("denied-screen");
+  if (denied) denied.classList.remove("active");
   document.getElementById("app-screen").classList.add("active");
   document.getElementById("current-user").textContent = profileName(currentUser);
   currentOutcomeView = currentUser;
   currentHabitView = currentUser;
+
+  // First time only: seed config (if missing) and start Firestore subscriptions.
+  // These were previously kicked off in the auth bootstrap, but security rules
+  // now require an allowlisted UID for /config/* and /dashboard/main reads —
+  // so subscribing before ensureRoleClaim() would spam permission-denied
+  // errors. We defer until the claim has succeeded.
+  if (!_dataBootstrapped) {
+    _dataBootstrapped = true;
+    try { await seedConfigIfMissing(); } catch (e) { console.error("Seed err:", e); }
+    subscribeConfig();
+    subscribeToData();
+  }
+
   renderAll();
   startPresence();
   ensureAuthAndPhotos();
+}
+
+// ---- Role claim (UID allowlist) -----------------------------------------
+//
+// /config/allowlist holds { matthew: <uid|null>, marie: <uid|null>, updatedAt }.
+// The doc is the single source of truth for which two Firebase Auth UIDs are
+// allowed to read/write everything else. On first claim per role, the slot is
+// written under the allowlist's permissive write rule (any authed user). After
+// both slots are filled, anyone else tapping "I'm Matthew/Marie" lands on the
+// denied screen and no other subscriptions are started.
+async function ensureRoleClaim() {
+  if (!currentUser || !currentUid) return false;
+  const ref = doc(db, "config", "allowlist");
+  try {
+    const snap = await getDoc(ref);
+    const data = snap.exists() ? snap.data() : {};
+    const claimedUid = data[currentUser];
+
+    if (!claimedUid) {
+      // Slot is empty — claim it for this device.
+      await setDoc(ref, {
+        [currentUser]: currentUid,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      return true;
+    }
+    if (claimedUid === currentUid) {
+      return true; // Already ours, fine.
+    }
+    // Someone else already claimed this role.
+    return false;
+  } catch (e) {
+    console.error("Role claim check failed:", e);
+    return false;
+  }
+}
+
+async function resetRoleClaim(role) {
+  if (role !== "matthew" && role !== "marie") return false;
+  const ref = doc(db, "config", "allowlist");
+  try {
+    await updateDoc(ref, {
+      [role]: null,
+      updatedAt: serverTimestamp()
+    });
+    return true;
+  } catch (e) {
+    console.error("Reset role claim failed (" + role + "):", e);
+    return false;
+  }
 }
 
 // ---- Firebase Auth (Anonymous) -------------------------------------------
@@ -1641,23 +1719,23 @@ async function resetDefaults() {
 ready(() => {
   console.log("M&M app initializing");
 
-  // Bootstrap order matters: sign in anonymously FIRST, then seed config (if
-  // needed), then subscribe to config + Firestore (rules require auth on every
-  // read/write).
+  // Bootstrap order matters: sign in anonymously FIRST. We DO NOT subscribe to
+  // Firestore here — security rules now require an allowlisted UID for every
+  // collection except /config/allowlist itself. Subscriptions are deferred to
+  // showApp(), which only runs after ensureRoleClaim() returns true.
   let _bootstrapped = false;
   onAuthStateChanged(auth, async (user) => {
     currentUid = user ? user.uid : null;
     if (user && !_bootstrapped) {
       _bootstrapped = true;
-      try { await seedConfigIfMissing(); } catch (e) { console.error("Seed err:", e); }
-      subscribeConfig();
-      subscribeToData();
-      if (currentUser) showApp();
-      else showLogin();
+      showLogin();
     }
-    if (user && currentUser) {
-      bindRoleToUid();
-      subscribeToPhotos();
+    // Defensive: if currentUser was set somehow (e.g. re-entry) and we just
+    // got our uid, run a claim check. With always-show-login this is rare.
+    if (user && currentUser && !_dataBootstrapped) {
+      const claimed = await ensureRoleClaim();
+      if (claimed) showApp();
+      else showAccessDenied();
     }
   });
 
@@ -1665,12 +1743,33 @@ ready(() => {
   signInAnonymously(auth).catch(e => console.error("Anonymous auth failed:", e));
 
   document.querySelectorAll(".who-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
+    // Skip the back button on the denied screen (wired separately below).
+    if (btn.id === "denied-back") return;
+    btn.addEventListener("click", async () => {
       currentUser = btn.dataset.user;
       localStorage.setItem("mm-user", currentUser);
-      showApp();
+      // Wait for anonymous auth to resolve so we have a UID to claim with.
+      if (!currentUid) {
+        await new Promise((resolve) => {
+          const off = onAuthStateChanged(auth, (u) => {
+            if (u) { currentUid = u.uid; off(); resolve(); }
+          });
+        });
+      }
+      const claimed = await ensureRoleClaim();
+      if (claimed) showApp();
+      else showAccessDenied();
     });
   });
+
+  const deniedBackBtn = document.getElementById("denied-back");
+  if (deniedBackBtn) {
+    deniedBackBtn.addEventListener("click", () => {
+      currentUser = null;
+      localStorage.removeItem("mm-user");
+      showLogin();
+    });
+  }
 
   const switchBtn = document.getElementById("switch-user");
   if (switchBtn) {
@@ -1837,6 +1936,29 @@ ready(() => {
   const resetBtn = document.getElementById("settings-reset-defaults");
   if (resetBtn) resetBtn.addEventListener("click", resetDefaults);
 
-  // Note: showApp()/showLogin() and subscribeToData() are now called from the
-  // onAuthStateChanged bootstrap above, after anonymous sign-in resolves.
+  // Role-claim resets. Both buttons are visible to both signed-in users so
+  // either can rescue the other if they lose their device.
+  const resetMatthewBtn = document.getElementById("settings-reset-matthew");
+  if (resetMatthewBtn) {
+    resetMatthewBtn.addEventListener("click", async () => {
+      if (!confirm("Are you sure? Anyone tapping \"I'm Matthew\" on the next device will become Matthew.")) return;
+      const ok = await resetRoleClaim("matthew");
+      if (ok) showToast("Matthew's slot is open.");
+      else showToast("Couldn't reset that slot.", "error");
+    });
+  }
+  const resetMarieBtn = document.getElementById("settings-reset-marie");
+  if (resetMarieBtn) {
+    resetMarieBtn.addEventListener("click", async () => {
+      if (!confirm("Are you sure? Anyone tapping \"I'm Marie\" on the next device will become Marie.")) return;
+      const ok = await resetRoleClaim("marie");
+      if (ok) showToast("Marie's slot is open.");
+      else showToast("Couldn't reset that slot.", "error");
+    });
+  }
+
+  // Note: showApp()/showLogin()/showAccessDenied() and Firestore subscriptions
+  // are kicked off from the .who-btn click handlers above, AFTER anonymous
+  // auth resolves AND ensureRoleClaim() succeeds. The auth state listener
+  // only shows the login picker; it no longer subscribes by itself.
 });
