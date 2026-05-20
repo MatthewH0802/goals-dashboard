@@ -21,8 +21,8 @@
     <div class="login-box">
       <h1>M&M</h1>
       <p class="login-sub">Goals Dashboard</p>
-      <button class="who-btn" data-user="matthew">I'm Matthew</button>
-      <button class="who-btn" data-user="marie">I'm Marie</button>
+      <button class="who-btn" data-user="matthew">I'm <span data-name="matthew">Matthew</span></button>
+      <button class="who-btn" data-user="marie">I'm <span data-name="marie">Marie</span></button>
     </div>
   </div>
 
@@ -34,7 +34,10 @@
         <span id="day-counter" class="day-pill">Day 1</span>
         <span id="partner-presence" class="partner-presence hidden"></span>
       </div>
-      <button id="switch-user" class="switch-btn">switch</button>
+      <div class="header-right">
+        <button id="switch-user" class="switch-btn">switch</button>
+        <button id="open-settings" class="settings-btn" aria-label="Settings" title="Settings">&#9881;</button>
+      </div>
     </header>
 
     <div id="visit-banner" class="visit-banner hidden"></div>
@@ -63,7 +66,7 @@
     <section id="tab-us" class="tab-pane">
       <h2 class="section-title">Us <span class="date-sub">moments together</span></h2>
       <div id="photos-empty" class="photos-empty hidden">
-        <div class="photos-empty-heart">❤</div>
+        <div class="photos-empty-heart">&#10084;</div>
         <p class="photos-empty-text">No memories yet.<br>Tap + to add the first one.</p>
       </div>
       <div id="photos-timeline" class="photos-timeline"></div>
@@ -85,7 +88,7 @@
           </div>
           <label class="caption-field">
             <span class="caption-label">Caption <span class="caption-optional">(optional)</span></span>
-            <input id="caption-input" type="text" maxlength="160" placeholder="Say something sweet…">
+            <input id="caption-input" type="text" maxlength="160" placeholder="Say something sweet&hellip;">
           </label>
           <label class="caption-field">
             <span class="caption-label">Date</span>
@@ -96,7 +99,7 @@
           </div>
           <div id="caption-progress" class="caption-progress hidden">
             <div class="caption-progress-bar"><div id="caption-progress-fill" class="caption-progress-fill"></div></div>
-            <div id="caption-progress-text" class="caption-progress-text">Uploading…</div>
+            <div id="caption-progress-text" class="caption-progress-text">Uploading&hellip;</div>
           </div>
           <div class="caption-actions">
             <button id="caption-cancel" class="caption-btn caption-btn-secondary" data-close="caption">Cancel</button>
@@ -107,9 +110,9 @@
 
       <!-- Fullscreen viewer -->
       <div id="viewer-modal" class="photo-viewer hidden" role="dialog" aria-modal="true">
-        <button id="viewer-close" class="viewer-close" aria-label="Close">×</button>
-        <button id="viewer-prev" class="viewer-nav viewer-prev" aria-label="Previous">‹</button>
-        <button id="viewer-next" class="viewer-nav viewer-next" aria-label="Next">›</button>
+        <button id="viewer-close" class="viewer-close" aria-label="Close">&times;</button>
+        <button id="viewer-prev" class="viewer-nav viewer-prev" aria-label="Previous">&lsaquo;</button>
+        <button id="viewer-next" class="viewer-nav viewer-next" aria-label="Next">&rsaquo;</button>
         <div id="viewer-stage" class="viewer-stage">
           <img id="viewer-img" class="viewer-img" alt="">
         </div>
@@ -123,8 +126,8 @@
     <!-- Habits week view -->
     <section id="tab-habits" class="tab-pane">
       <div class="person-toggle">
-        <button class="person-btn active" data-person="matthew">Matthew</button>
-        <button class="person-btn" data-person="marie">Marie</button>
+        <button class="person-btn active" data-person="matthew" data-name="matthew">Matthew</button>
+        <button class="person-btn" data-person="marie" data-name="marie">Marie</button>
         <button class="person-btn" data-person="shared">Shared</button>
       </div>
       <div id="habits-week-grid"></div>
@@ -133,8 +136,8 @@
     <!-- Outcomes -->
     <section id="tab-outcomes" class="tab-pane">
       <div class="person-toggle">
-        <button class="person-btn active" data-person="matthew">Matthew</button>
-        <button class="person-btn" data-person="marie">Marie</button>
+        <button class="person-btn active" data-person="matthew" data-name="matthew">Matthew</button>
+        <button class="person-btn" data-person="marie" data-name="marie">Marie</button>
         <button class="person-btn" data-person="shared">Shared</button>
       </div>
       <div id="outcomes-list"></div>
@@ -143,41 +146,41 @@
     <!-- Standards (formerly the "Us" tab) -->
     <section id="tab-standards" class="tab-pane">
       <p class="muted">Rate each other 1-5 during Sunday check-ins.</p>
-      <h3 class="sub-title">Matthew rates Marie</h3>
+      <h3 class="sub-title"><span data-name="matthew">Matthew</span> rates <span data-name="marie">Marie</span></h3>
       <div id="standards-marie"></div>
-      <h3 class="sub-title">Marie rates Matthew</h3>
+      <h3 class="sub-title"><span data-name="marie">Marie</span> rates <span data-name="matthew">Matthew</span></h3>
       <div id="standards-matthew"></div>
     </section>
 
     <!-- Check-in -->
     <section id="tab-checkin" class="tab-pane">
-      <p class="muted">Sundays · 1pm PST / 4pm EST · ~30 min</p>
+      <p class="muted">Sundays &middot; 1pm PST / 4pm EST &middot; ~30 min</p>
       <div class="question-card">
         <div class="q-label">Discussion question</div>
         <p id="discussion-q"></p>
-        <button id="new-q" class="text-btn">New question ↻</button>
+        <button id="new-q" class="text-btn">New question &#8635;</button>
       </div>
       <div class="checkin-step">
-        <h3>1 · Gratitude</h3>
+        <h3>1 &middot; Gratitude</h3>
         <p class="muted">What did the other do this week you want repeated?</p>
         <textarea id="ci-gratitude" placeholder="Write together..."></textarea>
       </div>
       <div class="checkin-step">
-        <h3>2 · State of the union</h3>
+        <h3>2 &middot; State of the union</h3>
         <p class="muted">Anything we missed addressing this week?</p>
         <textarea id="ci-issues"></textarea>
       </div>
       <div class="checkin-step">
-        <h3>3 · Standards check</h3>
+        <h3>3 &middot; Standards check</h3>
         <p class="muted">Switch to Standards tab and rate each other.</p>
       </div>
       <div class="checkin-step">
-        <h3>4 · Goals review</h3>
+        <h3>4 &middot; Goals review</h3>
         <p class="muted">How did we do on what we said we'd do?</p>
         <textarea id="ci-goals"></textarea>
       </div>
       <div class="checkin-step">
-        <h3>5 · Looking ahead</h3>
+        <h3>5 &middot; Looking ahead</h3>
         <p class="muted">Next visit? Date night? What's coming?</p>
         <textarea id="ci-ahead"></textarea>
       </div>
@@ -189,6 +192,130 @@
     </section>
 
     <div id="sync-indicator" class="sync-pill">synced</div>
+
+    <!-- Toast for errors -->
+    <div id="toast" class="toast hidden"></div>
+
+    <!-- Settings overlay -->
+    <div id="settings-overlay" class="settings-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <header class="settings-header">
+        <h2 id="settings-title" class="settings-title">Settings</h2>
+        <button id="settings-close" class="settings-close" aria-label="Close settings">&times;</button>
+      </header>
+
+      <div class="settings-body">
+
+        <!-- Profiles -->
+        <section class="settings-section" data-section="profiles">
+          <button class="settings-section-header" data-toggle="profiles">
+            <span class="settings-section-label">Profiles</span>
+            <span class="settings-section-chev">&#9656;</span>
+          </button>
+          <div class="settings-section-body" data-body="profiles">
+            <div id="settings-profiles"></div>
+          </div>
+        </section>
+
+        <!-- Visits -->
+        <section class="settings-section" data-section="visits">
+          <button class="settings-section-header" data-toggle="visits">
+            <span class="settings-section-label">Visits</span>
+            <span class="settings-section-chev">&#9656;</span>
+          </button>
+          <div class="settings-section-body" data-body="visits">
+            <div id="settings-visits"></div>
+            <button class="settings-add-btn" data-add="visit">+ Add visit</button>
+          </div>
+        </section>
+
+        <!-- Habits -->
+        <section class="settings-section" data-section="habits">
+          <button class="settings-section-header" data-toggle="habits">
+            <span class="settings-section-label">Habits</span>
+            <span class="settings-section-chev">&#9656;</span>
+          </button>
+          <div class="settings-section-body" data-body="habits">
+            <div class="settings-tabs" data-group="habits">
+              <button class="settings-tab active" data-habits-tab="matthew" data-name="matthew">Matthew</button>
+              <button class="settings-tab" data-habits-tab="marie" data-name="marie">Marie</button>
+              <button class="settings-tab" data-habits-tab="shared">Shared</button>
+            </div>
+            <div id="settings-habits"></div>
+            <button class="settings-add-btn" data-add="habit">+ Add habit</button>
+          </div>
+        </section>
+
+        <!-- Goals -->
+        <section class="settings-section" data-section="goals">
+          <button class="settings-section-header" data-toggle="goals">
+            <span class="settings-section-label">Goals</span>
+            <span class="settings-section-chev">&#9656;</span>
+          </button>
+          <div class="settings-section-body" data-body="goals">
+            <div class="settings-tabs" data-group="goals">
+              <button class="settings-tab active" data-goals-tab="matthew" data-name="matthew">Matthew</button>
+              <button class="settings-tab" data-goals-tab="marie" data-name="marie">Marie</button>
+              <button class="settings-tab" data-goals-tab="shared">Shared</button>
+            </div>
+            <div id="settings-goals"></div>
+            <button class="settings-add-btn" data-add="goal">+ Add goal</button>
+          </div>
+        </section>
+
+        <!-- Standards -->
+        <section class="settings-section" data-section="standards">
+          <button class="settings-section-header" data-toggle="standards">
+            <span class="settings-section-label">Standards</span>
+            <span class="settings-section-chev">&#9656;</span>
+          </button>
+          <div class="settings-section-body" data-body="standards">
+            <div class="settings-tabs" data-group="standards">
+              <button class="settings-tab active" data-standards-tab="marie" data-name="marie">For Marie</button>
+              <button class="settings-tab" data-standards-tab="matthew" data-name="matthew">For Matthew</button>
+            </div>
+            <div id="settings-standards"></div>
+            <button class="settings-add-btn" data-add="standard">+ Add standard</button>
+          </div>
+        </section>
+
+        <!-- Check-in questions -->
+        <section class="settings-section" data-section="questions">
+          <button class="settings-section-header" data-toggle="questions">
+            <span class="settings-section-label">Check-in questions</span>
+            <span class="settings-section-chev">&#9656;</span>
+          </button>
+          <div class="settings-section-body" data-body="questions">
+            <div id="settings-questions"></div>
+            <button class="settings-add-btn" data-add="question">+ Add question</button>
+          </div>
+        </section>
+
+        <!-- App -->
+        <section class="settings-section" data-section="app">
+          <button class="settings-section-header" data-toggle="app">
+            <span class="settings-section-label">App</span>
+            <span class="settings-section-chev">&#9656;</span>
+          </button>
+          <div class="settings-section-body" data-body="app">
+            <div id="settings-app"></div>
+          </div>
+        </section>
+
+        <!-- Danger zone -->
+        <section class="settings-section settings-danger" data-section="danger">
+          <button class="settings-section-header" data-toggle="danger">
+            <span class="settings-section-label">Danger zone</span>
+            <span class="settings-section-chev">&#9656;</span>
+          </button>
+          <div class="settings-section-body" data-body="danger">
+            <button id="settings-reset-defaults" class="settings-danger-btn">Reset all habits &amp; goals to defaults</button>
+            <p class="settings-help">This re-seeds Firestore from the built-in defaults. You will be asked to confirm.</p>
+          </div>
+        </section>
+
+      </div>
+    </div>
+
   </div>
 
   <script type="module" src="app.js"></script>

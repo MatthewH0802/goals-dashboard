@@ -1,7 +1,7 @@
 // M&M Goals Dashboard - Firebase-synced app
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import {
-  getFirestore, doc, setDoc, onSnapshot,
+  getFirestore, doc, setDoc, updateDoc, onSnapshot, getDoc, writeBatch,
   addDoc, collection, query, orderBy, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import {
@@ -26,11 +26,21 @@ const auth = getAuth(fbApp);
 const storage = getStorage(fbApp);
 const DOC_REF = doc(db, "dashboard", "main");
 
-const START_DATE = "2026-05-18";
-const VISIT_START = "2026-05-25";
-const VISIT_END = "2026-05-29";
+// ---- Built-in defaults (used to seed config/* on first run) -------------
+const DEFAULT_START_DATE = "2026-05-18";
 
-const OUTCOMES = {
+const DEFAULT_PROFILES = {
+  matthew: { displayName: "Matthew", color: "#000000" },
+  marie:   { displayName: "Marie",   color: "#000000" }
+};
+
+const DEFAULT_VISITS = {
+  items: [
+    { id: "v-may2026", name: "Marie visit", start: "2026-05-25", end: "2026-05-29" }
+  ]
+};
+
+const DEFAULT_OUTCOMES = {
   matthew: [
     { id: "mw-gm", cat: "career", name: "Hire Zecto GM", target: "Jun 1, 2026", focus: true },
     { id: "mw-realestate", cat: "career", name: "Real estate license", target: "Sept 1, 2026", focus: false },
@@ -56,7 +66,7 @@ const OUTCOMES = {
   ]
 };
 
-const HABITS = {
+const DEFAULT_HABITS = {
   matthew: [
     { id: "mw-gym", name: "Gym", emoji: "🏋️", target: "4-7x/week" },
     { id: "mw-run", name: "Run", emoji: "🏃", target: "1x/week" },
@@ -89,38 +99,59 @@ const HABITS = {
   ]
 };
 
-const STANDARDS_MARIE = [
-  { id: "s-mr-tone", name: "Mindful of tone & delivery", ctx: "How she says things" },
-  { id: "s-mr-direct", name: "Lovingly direct", ctx: "Straightforward, not hinting" },
-  { id: "s-mr-absolutes", name: "No absolutes", ctx: "No 'never' or 'always'" },
-  { id: "s-mr-actions", name: "Love through actions", ctx: "Not only words" },
-  { id: "s-mr-collab", name: "Collaborates on solutions", ctx: "Us vs the problem" },
-  { id: "s-mr-team", name: "Team mindset", ctx: "We're a team" }
-];
+const DEFAULT_HABIT_SECTIONS = {
+  body: { title: "Body", ids: ["mw-gym","mw-run","mw-vitamins","mw-water","mw-bedtime","mw-wake6","mw-screen","mr-gym","mr-wake","mr-vitamins","mr-water","mr-sweets","mr-screen"] },
+  mind: { title: "Mind & Spirit", ids: ["mw-chess","mw-agpeya","mr-agpeya","mr-ig-inf","sh-reading","sh-communion","sh-confession"] },
+  together: { title: "Together", ids: ["sh-prayer","sh-checkin","sh-datenight","sh-watch"] }
+};
 
-const STANDARDS_MATTHEW = [
-  { id: "s-mw-concerns", name: "Takes concerns seriously", ctx: "Doesn't dismiss" },
-  { id: "s-mw-voice", name: "Calm voice", ctx: "Especially during tension" },
-  { id: "s-mw-curious", name: "Asks her questions", ctx: "Learning about her" },
-  { id: "s-mw-detail", name: "Goes into detail", ctx: "On things she wants to know" },
-  { id: "s-mw-team", name: "Team mindset", ctx: "Us vs the problem" }
-];
+const DEFAULT_STANDARDS = {
+  marie: [
+    { id: "s-mr-tone", name: "Mindful of tone & delivery", ctx: "How she says things" },
+    { id: "s-mr-direct", name: "Lovingly direct", ctx: "Straightforward, not hinting" },
+    { id: "s-mr-absolutes", name: "No absolutes", ctx: "No 'never' or 'always'" },
+    { id: "s-mr-actions", name: "Love through actions", ctx: "Not only words" },
+    { id: "s-mr-collab", name: "Collaborates on solutions", ctx: "Us vs the problem" },
+    { id: "s-mr-team", name: "Team mindset", ctx: "We're a team" }
+  ],
+  matthew: [
+    { id: "s-mw-concerns", name: "Takes concerns seriously", ctx: "Doesn't dismiss" },
+    { id: "s-mw-voice", name: "Calm voice", ctx: "Especially during tension" },
+    { id: "s-mw-curious", name: "Asks her questions", ctx: "Learning about her" },
+    { id: "s-mw-detail", name: "Goes into detail", ctx: "On things she wants to know" },
+    { id: "s-mw-team", name: "Team mindset", ctx: "Us vs the problem" }
+  ]
+};
 
-const QUESTIONS = [
-  "What's one thing I did this week that made you feel loved?",
-  "Anything you've been holding back?",
-  "Highlight of your week?",
-  "Something I could do more of?",
-  "Something I could do less of?",
-  "How are you feeling about us, 1-10?",
-  "A worry I don't know about?",
-  "When did you feel closest to me this week?",
-  "When did you feel distant this week?",
-  "What's one commitment I made that I haven't followed through on?",
-  "What should we keep doing because it works?",
-  "What's something you appreciated about how I handled something?",
-  "What's something hard you'd want my support with?"
-];
+const DEFAULT_QUESTIONS = {
+  items: [
+    "What's one thing I did this week that made you feel loved?",
+    "Anything you've been holding back?",
+    "Highlight of your week?",
+    "Something I could do more of?",
+    "Something I could do less of?",
+    "How are you feeling about us, 1-10?",
+    "A worry I don't know about?",
+    "When did you feel closest to me this week?",
+    "When did you feel distant this week?",
+    "What's one commitment I made that I haven't followed through on?",
+    "What should we keep doing because it works?",
+    "What's something you appreciated about how I handled something?",
+    "What's something hard you'd want my support with?"
+  ]
+};
+
+// ---- Runtime config (mirrors Firestore /config/*) ------------------------
+let config = {
+  app:            { startDate: DEFAULT_START_DATE, schemaVersion: 0 },
+  profiles:       JSON.parse(JSON.stringify(DEFAULT_PROFILES)),
+  habits:         JSON.parse(JSON.stringify(DEFAULT_HABITS)),
+  habit_sections: JSON.parse(JSON.stringify(DEFAULT_HABIT_SECTIONS)),
+  outcomes:       JSON.parse(JSON.stringify(DEFAULT_OUTCOMES)),
+  standards:      JSON.parse(JSON.stringify(DEFAULT_STANDARDS)),
+  questions:      JSON.parse(JSON.stringify(DEFAULT_QUESTIONS)),
+  visits:         JSON.parse(JSON.stringify(DEFAULT_VISITS))
+};
 
 let state = {
   outcomeProgress: {},
@@ -138,12 +169,23 @@ let currentOutcomeView = "matthew";
 let currentHabitView = "matthew";
 let writeTimer = null;
 
+// Settings UI state
+let settingsState = {
+  open: { profiles: false, visits: false, habits: false, goals: false, standards: false, questions: false, app: false, danger: false },
+  habitsTab: "matthew",
+  goalsTab: "matthew",
+  standardsTab: "marie"
+};
+
 // Photos state
 let photos = []; // [{ id, url, caption, takenAt (YYYY-MM-DD), uploadedAt, uploader }]
 let photosUnsub = null;
 let pendingPhotoFile = null;
 let pendingPhotoDataUrl = null;
 let viewerIndex = 0;
+
+// Config subscription handles
+let configUnsubs = [];
 
 function ready(fn) {
   if (document.readyState !== "loading") fn();
@@ -155,6 +197,12 @@ function todayISO() { const d=new Date(); return d.getFullYear()+"-"+pad2(d.getM
 function isoDate(d) { return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()); }
 function daysBetween(a, b) {
   return Math.floor((new Date(b + "T00:00:00") - new Date(a + "T00:00:00")) / 86400000);
+}
+function startDate() { return (config.app && config.app.startDate) || DEFAULT_START_DATE; }
+function profileName(role) {
+  if (!role) return "";
+  const p = (config.profiles && config.profiles[role]) || {};
+  return p.displayName || (role.charAt(0).toUpperCase() + role.slice(1));
 }
 function getCurrentWeek() {
   const today = new Date();
@@ -171,11 +219,12 @@ function getCurrentWeek() {
 function getStreak(habitId) {
   let streak = 0;
   const today = new Date();
+  const sd = startDate();
   for (let i = 0; i < 365; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() - i);
     const dStr = isoDate(d);
-    if (dStr < START_DATE) break;
+    if (dStr < sd) break;
     const k = dStr + "_" + habitId;
     if (state.habitLog[k] === "done") streak++;
     else if (i === 0 && state.habitLog[k] !== "miss") continue;
@@ -189,6 +238,22 @@ function setSyncStatus(status) {
   if (!el) return;
   el.textContent = status;
   el.classList.toggle("syncing", status === "syncing");
+}
+
+function showToast(msg, kind) {
+  const el = document.getElementById("toast");
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.remove("hidden");
+  el.classList.toggle("error", kind === "error");
+  // Force reflow then fade in
+  void el.offsetWidth;
+  el.classList.add("visible");
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => {
+    el.classList.remove("visible");
+    setTimeout(() => el.classList.add("hidden"), 250);
+  }, 2400);
 }
 
 function pushToFirebase() {
@@ -218,6 +283,83 @@ function subscribeToData() {
   });
 }
 
+// ---- Config: seed + subscribe -------------------------------------------
+
+async function seedConfigIfMissing() {
+  try {
+    const appRef = doc(db, "config", "app");
+    const snap = await getDoc(appRef);
+    if (snap.exists()) return false;
+    const batch = writeBatch(db);
+    batch.set(doc(db, "config", "app"),            { startDate: DEFAULT_START_DATE, schemaVersion: 1 });
+    batch.set(doc(db, "config", "profiles"),       DEFAULT_PROFILES);
+    batch.set(doc(db, "config", "habits"),         DEFAULT_HABITS);
+    batch.set(doc(db, "config", "habit_sections"), DEFAULT_HABIT_SECTIONS);
+    batch.set(doc(db, "config", "outcomes"),       DEFAULT_OUTCOMES);
+    batch.set(doc(db, "config", "standards"),      DEFAULT_STANDARDS);
+    batch.set(doc(db, "config", "questions"),      DEFAULT_QUESTIONS);
+    batch.set(doc(db, "config", "visits"),         DEFAULT_VISITS);
+    await batch.commit();
+    console.log("Config seeded.");
+    return true;
+  } catch (e) {
+    console.error("Config seed failed:", e);
+    return false;
+  }
+}
+
+const CONFIG_DOCS = ["app","profiles","habits","habit_sections","outcomes","standards","questions","visits"];
+
+function subscribeConfig() {
+  // Tear down any prior subscriptions (defensive)
+  configUnsubs.forEach(u => { try { u(); } catch(e){} });
+  configUnsubs = [];
+  CONFIG_DOCS.forEach(name => {
+    const ref = doc(db, "config", name);
+    const unsub = onSnapshot(ref, (snap) => {
+      if (!snap.exists()) return;
+      config[name] = snap.data();
+      // Rerender if app is up
+      if (currentUser) renderAll();
+      const overlay = document.getElementById("settings-overlay");
+      if (overlay && !overlay.classList.contains("hidden")) renderSettings();
+      // Refresh login name labels regardless (visible before pick)
+      applyNameLabels();
+    }, (err) => {
+      console.error("Config sync error (" + name + "):", err);
+    });
+    configUnsubs.push(unsub);
+  });
+}
+
+async function saveConfigDoc(name, data) {
+  try {
+    setSyncStatus("syncing");
+    await setDoc(doc(db, "config", name), data, { merge: false });
+    setSyncStatus("synced");
+    return true;
+  } catch (e) {
+    console.error("Config save failed (" + name + "):", e);
+    setSyncStatus("offline");
+    showToast("Couldn't save changes. Try again.", "error");
+    return false;
+  }
+}
+
+async function patchConfigDoc(name, patch) {
+  try {
+    setSyncStatus("syncing");
+    await setDoc(doc(db, "config", name), patch, { merge: true });
+    setSyncStatus("synced");
+    return true;
+  } catch (e) {
+    console.error("Config patch failed (" + name + "):", e);
+    setSyncStatus("offline");
+    showToast("Couldn't save changes. Try again.", "error");
+    return false;
+  }
+}
+
 function showLogin() {
   document.getElementById("login-screen").classList.add("active");
   document.getElementById("app-screen").classList.remove("active");
@@ -226,7 +368,7 @@ function showLogin() {
 function showApp() {
   document.getElementById("login-screen").classList.remove("active");
   document.getElementById("app-screen").classList.add("active");
-  document.getElementById("current-user").textContent = currentUser === "matthew" ? "Matthew" : "Marie";
+  document.getElementById("current-user").textContent = profileName(currentUser);
   currentOutcomeView = currentUser;
   currentHabitView = currentUser;
   renderAll();
@@ -290,11 +432,23 @@ function startPresence() {
     const el = document.getElementById("partner-presence");
     if (!el) return;
     el.classList.toggle("hidden", !online);
-    el.textContent = partner.charAt(0).toUpperCase() + partner.slice(1);
+    el.textContent = profileName(partner);
+  });
+}
+
+// Wherever we render the literal "Matthew"/"Marie" text from data attributes,
+// keep it in sync with config.profiles.
+function applyNameLabels() {
+  document.querySelectorAll("[data-name]").forEach(el => {
+    const role = el.dataset.name;
+    if (role === "matthew" || role === "marie") {
+      el.textContent = profileName(role);
+    }
   });
 }
 
 function renderAll() {
+  applyNameLabels();
   renderHeader();
   renderToday();
   renderHabitsWeek();
@@ -304,41 +458,75 @@ function renderAll() {
   renderUs();
 }
 
+function formatVisitRange(v) {
+  if (!v || !v.start) return "";
+  const [ys, ms, ds] = v.start.split("-").map(Number);
+  const [ye, me, de] = (v.end || v.start).split("-").map(Number);
+  const sd = new Date(ys, (ms || 1) - 1, ds || 1);
+  const ed = new Date(ye, (me || 1) - 1, de || 1);
+  const sStr = sd.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const eStr = ed.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  if (v.start === v.end) return sStr;
+  return sStr + " – " + eStr;
+}
+
+function pickActiveVisit(today) {
+  const items = (config.visits && Array.isArray(config.visits.items)) ? config.visits.items.slice() : [];
+  // Soonest upcoming or currently active (today <= end). Sort by start ascending.
+  const upcoming = items
+    .filter(v => v && v.end && today <= v.end)
+    .sort((a, b) => (a.start || "").localeCompare(b.start || ""));
+  return upcoming[0] || null;
+}
+
 function renderHeader() {
   const today = todayISO();
   const dayEl = document.getElementById("day-counter");
-  if (today < START_DATE) dayEl.textContent = "starts May 18";
-  else dayEl.textContent = "Day " + (daysBetween(START_DATE, today) + 1);
+  const sd = startDate();
+  if (today < sd) {
+    const [y, m, d] = sd.split("-").map(Number);
+    const dt = new Date(y, (m || 1) - 1, d || 1);
+    dayEl.textContent = "starts " + dt.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  } else {
+    dayEl.textContent = "Day " + (daysBetween(sd, today) + 1);
+  }
 
   const banner = document.getElementById("visit-banner");
-  if (today >= VISIT_START && today <= VISIT_END) {
+  const v = pickActiveVisit(today);
+  if (!v) {
+    banner.classList.add("hidden");
+    banner.innerHTML = "";
+    return;
+  }
+  const range = formatVisitRange(v);
+  const name = v.name || "Visit";
+  const partnerName = currentUser
+    ? profileName(currentUser === "matthew" ? "marie" : "matthew")
+    : name;
+  if (today >= v.start && today <= v.end) {
     banner.classList.remove("hidden");
     banner.innerHTML = `<span class="visit-heart">❤</span>
-      <span class="visit-headline">Marie is here</span>
+      <span class="visit-headline">${escapeHtml(partnerName)} is here</span>
       <span class="visit-label">Book the next trip before she leaves</span>
-      <span class="visit-dates">May 25 – 29</span>`;
-  } else if (today < VISIT_START) {
-    const d = daysBetween(today, VISIT_START);
+      <span class="visit-dates">${escapeHtml(range)}</span>`;
+  } else if (today < v.start) {
+    const d = daysBetween(today, v.start);
     banner.classList.remove("hidden");
     banner.innerHTML = `<span class="visit-heart">❤</span>
       <span class="visit-count">${d}</span>
-      <span class="visit-label">${d === 1 ? "day" : "days"} until Marie</span>
-      <span class="visit-dates">May 25 – 29</span>`;
+      <span class="visit-label">${d === 1 ? "day" : "days"} until ${escapeHtml(name)}</span>
+      <span class="visit-dates">${escapeHtml(range)}</span>`;
   } else {
     banner.classList.add("hidden");
+    banner.innerHTML = "";
   }
 }
 
-const HABIT_SECTIONS = {
-  body: { title: "Body", ids: ["mw-gym","mw-run","mw-vitamins","mw-water","mw-bedtime","mw-wake6","mw-screen","mr-gym","mr-wake","mr-vitamins","mr-water","mr-sweets","mr-screen"] },
-  mind: { title: "Mind & Spirit", ids: ["mw-chess","mw-agpeya","mr-agpeya","mr-ig-inf","sh-reading","sh-communion","sh-confession"] },
-  together: { title: "Together", ids: ["sh-prayer","sh-checkin","sh-datenight","sh-watch"] }
-};
-
 function sectionFor(id) {
-  if (HABIT_SECTIONS.body.ids.includes(id)) return "body";
-  if (HABIT_SECTIONS.mind.ids.includes(id)) return "mind";
-  if (HABIT_SECTIONS.together.ids.includes(id)) return "together";
+  const s = config.habit_sections || {};
+  if (s.body && Array.isArray(s.body.ids) && s.body.ids.includes(id)) return "body";
+  if (s.mind && Array.isArray(s.mind.ids) && s.mind.ids.includes(id)) return "mind";
+  if (s.together && Array.isArray(s.together.ids) && s.together.ids.includes(id)) return "together";
   return "body";
 }
 
@@ -347,11 +535,11 @@ function habitCardHtml(h, today, locked) {
   const done = state.habitLog[k] === "done";
   const streak = getStreak(h.id);
   return `<button class="quick-log-btn ${done ? "done" : ""}" data-habit="${h.id}" ${locked ? "disabled" : ""}>
-    <span class="qlog-emoji">${h.emoji}</span>
+    <span class="qlog-emoji">${h.emoji || ""}</span>
     <span class="qlog-check">✓</span>
     ${streak > 0 ? `<span class="qlog-streak">${streak} day${streak === 1 ? "" : "s"}</span>` : ""}
-    <span class="qlog-name">${h.name}</span>
-    <span class="qlog-meta">${h.target}</span>
+    <span class="qlog-name">${escapeHtml(h.name || "")}</span>
+    <span class="qlog-meta">${escapeHtml(h.target || "")}</span>
   </button>`;
 }
 
@@ -359,21 +547,24 @@ function renderToday() {
   const today = todayISO();
   document.getElementById("today-date").textContent = new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
 
-  const myHabits = HABITS[currentUser] || [];
-  const sharedHabits = HABITS.shared || [];
+  const habits = config.habits || { matthew: [], marie: [], shared: [] };
+  const myHabits = habits[currentUser] || [];
+  const sharedHabits = habits.shared || [];
   const allMine = [...myHabits, ...sharedHabits];
-  const locked = today < START_DATE;
+  const locked = today < startDate();
 
   // Group by section
   const groups = { body: [], mind: [], together: [] };
   allMine.forEach(h => groups[sectionFor(h.id)].push(h));
 
+  const sections = config.habit_sections || {};
   let html = "";
-  Object.keys(HABIT_SECTIONS).forEach(key => {
+  ["body","mind","together"].forEach(key => {
     const list = groups[key];
     if (!list.length) return;
+    const title = (sections[key] && sections[key].title) || key;
     html += `<div class="habit-section">
-      <h3 class="habit-section-title">${HABIT_SECTIONS[key].title}</h3>
+      <h3 class="habit-section-title">${escapeHtml(title)}</h3>
       <div class="quick-log-grid">${list.map(h => habitCardHtml(h, today, locked)).join("")}</div>
     </div>`;
   });
@@ -383,10 +574,9 @@ function renderToday() {
   const myDone = allMine.filter(h => state.habitLog[today + "_" + h.id] === "done").length;
   const myTotal = allMine.length;
   const partner = currentUser === "matthew" ? "marie" : "matthew";
-  const partnerHabits = [...(HABITS[partner] || []), ...sharedHabits];
+  const partnerHabits = [...(habits[partner] || []), ...sharedHabits];
   const partnerDone = partnerHabits.filter(h => state.habitLog[today + "_" + h.id] === "done").length;
   const partnerTotal = partnerHabits.length;
-  const partnerName = partner.charAt(0).toUpperCase() + partner.slice(1);
   const hero = document.getElementById("hero-line");
   if (hero) {
     if (locked) {
@@ -394,7 +584,7 @@ function renderToday() {
       hero.innerHTML = "";
     } else {
       hero.classList.remove("empty");
-      hero.innerHTML = `<strong>You: ${myDone}/${myTotal}</strong> &middot; ${partnerName}: ${partnerDone}/${partnerTotal}`;
+      hero.innerHTML = `<strong>You: ${myDone}/${myTotal}</strong> &middot; ${escapeHtml(profileName(partner))}: ${partnerDone}/${partnerTotal}`;
     }
   }
 
@@ -410,13 +600,15 @@ function renderToday() {
     });
   });
 
-  const allOutcomes = [...OUTCOMES.matthew, ...OUTCOMES.marie, ...OUTCOMES.shared];
-  const myFocus = allOutcomes.filter(o => o.focus && (OUTCOMES[currentUser].includes(o) || OUTCOMES.shared.includes(o)));
+  const outcomes = config.outcomes || { matthew: [], marie: [], shared: [] };
+  const myOutcomes = outcomes[currentUser] || [];
+  const sharedOutcomes = outcomes.shared || [];
+  const myFocus = [...myOutcomes, ...sharedOutcomes].filter(o => o && o.focus);
   document.getElementById("today-focus").innerHTML = myFocus.map(o => {
     const pct = state.outcomeProgress[o.id] || 0;
     return `<div class="focus-card">
-      <div class="focus-name">${o.name}</div>
-      <div class="focus-meta">${o.target} · ${pct}%</div>
+      <div class="focus-name">${escapeHtml(o.name || "")}</div>
+      <div class="focus-meta">${escapeHtml(o.target || "")} · ${pct}%</div>
       <div class="focus-bar"><div class="focus-bar-fill" style="width:${pct}%"></div></div>
     </div>`;
   }).join("");
@@ -428,10 +620,11 @@ function renderHabitsWeek() {
     b.onclick = () => { currentHabitView = b.dataset.person; renderHabitsWeek(); };
   });
 
-  const habits = HABITS[currentHabitView] || [];
+  const habits = (config.habits && config.habits[currentHabitView]) || [];
   const week = getCurrentWeek();
   const dayNames = ["M", "T", "W", "T", "F", "S", "S"];
   const today = todayISO();
+  const sd = startDate();
 
   let html = `<div class="habit-row header">
     <div></div>
@@ -442,13 +635,13 @@ function renderHabitsWeek() {
   habits.forEach(h => {
     const streak = getStreak(h.id);
     html += `<div class="habit-row">
-      <div class="habit-name">${h.emoji} ${h.name}<span class="sub">${h.target}</span></div>
+      <div class="habit-name">${h.emoji || ""} ${escapeHtml(h.name || "")}<span class="sub">${escapeHtml(h.target || "")}</span></div>
       ${week.map(d => {
         const dStr = isoDate(d);
         const k = dStr + "_" + h.id;
         const v = state.habitLog[k];
         const isToday = dStr === today;
-        const locked = dStr < START_DATE;
+        const locked = dStr < sd;
         if (locked) return `<button class="habit-cell locked" disabled></button>`;
         const cls = v === "done" ? "done" : v === "miss" ? "miss" : "";
         const ico = v === "done" ? "✓" : v === "miss" ? "✗" : "";
@@ -479,14 +672,14 @@ function renderOutcomes() {
     b.onclick = () => { currentOutcomeView = b.dataset.person; renderOutcomes(); };
   });
 
-  const list = OUTCOMES[currentOutcomeView] || [];
+  const list = (config.outcomes && config.outcomes[currentOutcomeView]) || [];
   document.getElementById("outcomes-list").innerHTML = list.map(o => {
     const pct = state.outcomeProgress[o.id] || 0;
     return `<div class="outcome-card">
       <div class="outcome-header">
         <div>
-          <div class="outcome-name">${o.name}${o.focus ? '<span class="focus-star">★</span>' : ""}</div>
-          <div class="outcome-target">${o.target}</div>
+          <div class="outcome-name">${escapeHtml(o.name || "")}${o.focus ? '<span class="focus-star">★</span>' : ""}</div>
+          <div class="outcome-target">${escapeHtml(o.target || "")}</div>
         </div>
         <div class="outcome-pct">${pct}%</div>
       </div>
@@ -511,21 +704,24 @@ function renderOutcomes() {
 
 function renderStandards() {
   const renderSec = (containerId, list) => {
-    document.getElementById(containerId).innerHTML = list.map(s => {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    el.innerHTML = (list || []).map(s => {
       const k = "std_" + s.id;
       const log = state.standardsLog[k] || [];
       const last = log.length ? log[log.length - 1].rating : null;
       return `<div class="standard-card">
-        <div class="standard-name">${s.name}</div>
+        <div class="standard-name">${escapeHtml(s.name || "")}</div>
         <div class="rating-row">
           ${[1, 2, 3, 4, 5].map(n => `<button class="rating-btn ${last === n ? "selected" : ""}" data-id="${s.id}" data-r="${n}">${n}</button>`).join("")}
         </div>
-        <div class="standard-context">${s.ctx}${log.length ? ` · ${log.length} ratings` : ""}</div>
+        <div class="standard-context">${escapeHtml(s.ctx || "")}${log.length ? ` · ${log.length} ratings` : ""}</div>
       </div>`;
     }).join("");
   };
-  renderSec("standards-marie", STANDARDS_MARIE);
-  renderSec("standards-matthew", STANDARDS_MATTHEW);
+  const stds = config.standards || { marie: [], matthew: [] };
+  renderSec("standards-marie", stds.marie || []);
+  renderSec("standards-matthew", stds.matthew || []);
 
   document.querySelectorAll(".rating-btn").forEach(b => {
     b.addEventListener("click", () => {
@@ -543,17 +739,19 @@ function renderStandards() {
 }
 
 function renderCheckin() {
-  document.getElementById("discussion-q").textContent = QUESTIONS[state.qIndex % QUESTIONS.length];
+  const qs = (config.questions && config.questions.items) || [];
+  const q = qs.length ? qs[state.qIndex % qs.length] : "";
+  document.getElementById("discussion-q").textContent = q;
   ["gratitude", "issues", "goals", "ahead"].forEach(f => {
     const el = document.getElementById("ci-" + f);
     if (el) el.value = state.currentCheckin[f] || "";
   });
   document.getElementById("checkin-archive").innerHTML = state.checkinArchive.slice(-10).reverse().map(c =>
-    `<div class="archive-item"><div class="date">${c.date}</div>
-    ${c.gratitude ? `<div><b>Grateful:</b> ${c.gratitude}</div>` : ""}
-    ${c.issues ? `<div><b>Issues:</b> ${c.issues}</div>` : ""}
-    ${c.goals ? `<div><b>Goals:</b> ${c.goals}</div>` : ""}
-    ${c.ahead ? `<div><b>Ahead:</b> ${c.ahead}</div>` : ""}
+    `<div class="archive-item"><div class="date">${escapeHtml(c.date || "")}</div>
+    ${c.gratitude ? `<div><b>Grateful:</b> ${escapeHtml(c.gratitude)}</div>` : ""}
+    ${c.issues ? `<div><b>Issues:</b> ${escapeHtml(c.issues)}</div>` : ""}
+    ${c.goals ? `<div><b>Goals:</b> ${escapeHtml(c.goals)}</div>` : ""}
+    ${c.ahead ? `<div><b>Ahead:</b> ${escapeHtml(c.ahead)}</div>` : ""}
     </div>`
   ).join("") || "<p class='muted'>No past check-ins yet.</p>";
 }
@@ -563,7 +761,7 @@ function renderCheckin() {
 const MONTH_LABELS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
 
 function escapeHtml(s) {
-  return String(s || "").replace(/[&<>"']/g, c => ({
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
   }[c]));
 }
@@ -611,10 +809,10 @@ function renderUs() {
 
   const html = keys.map(k => {
     const list = groups.get(k);
-    const cards = list.map((p, idx) => {
+    const cards = list.map((p) => {
       const globalIdx = photos.indexOf(p);
       const uploader = p.uploader || "";
-      const uploaderName = uploader === "matthew" ? "Matthew" : uploader === "marie" ? "Marie" : "—";
+      const uploaderName = uploader === "matthew" || uploader === "marie" ? profileName(uploader) : "—";
       const caption = p.caption ? `<div class="photo-card-caption">${escapeHtml(p.caption)}</div>` : `<div class="photo-card-caption empty">No caption</div>`;
       return `<button class="photo-card" data-idx="${globalIdx}" type="button">
         <div class="photo-card-img-wrap"><img class="photo-card-img" loading="lazy" src="${escapeHtml(p.url)}" alt=""></div>
@@ -622,7 +820,7 @@ function renderUs() {
           ${caption}
           <div class="photo-card-meta">
             <span>${formatPhotoDate(p.takenAt)}</span>
-            <span class="by"><span class="by-dot ${uploader}"></span>${uploaderName}</span>
+            <span class="by"><span class="by-dot ${uploader}"></span>${escapeHtml(uploaderName)}</span>
           </div>
         </div>
       </button>`;
@@ -730,7 +928,7 @@ function openCaptionModal() {
   if (preview && pendingPhotoDataUrl) preview.src = pendingPhotoDataUrl;
   if (captionInput) captionInput.value = "";
   if (dateInput) dateInput.value = todayISO();
-  if (posterName) posterName.textContent = currentUser === "matthew" ? "Matthew" : "Marie";
+  if (posterName) posterName.textContent = profileName(currentUser);
   if (progress) progress.classList.add("hidden");
   if (fill) fill.style.width = "0%";
 
@@ -824,7 +1022,7 @@ function renderViewer() {
     }
   }
   if (capMeta) {
-    const uploader = p.uploader === "matthew" ? "Matthew" : p.uploader === "marie" ? "Marie" : "";
+    const uploader = (p.uploader === "matthew" || p.uploader === "marie") ? profileName(p.uploader) : "";
     capMeta.textContent = `${formatPhotoDate(p.takenAt)}${uploader ? " · " + uploader : ""}`;
   }
   if (prev) prev.disabled = viewerIndex <= 0;
@@ -869,18 +1067,590 @@ function attachViewerSwipe() {
   }, { passive: true });
 }
 
+// ---- Settings overlay ----------------------------------------------------
+
+function uid(prefix) {
+  return (prefix || "id") + "-" + Math.random().toString(36).slice(2, 8) + "-" + Date.now().toString(36).slice(-4);
+}
+
+function openSettings() {
+  const overlay = document.getElementById("settings-overlay");
+  if (!overlay) return;
+  overlay.classList.remove("hidden");
+  renderSettings();
+}
+function closeSettings() {
+  const overlay = document.getElementById("settings-overlay");
+  if (overlay) overlay.classList.add("hidden");
+}
+
+function renderSettings() {
+  // Apply open-state classes
+  ["profiles","visits","habits","goals","standards","questions","app","danger"].forEach(name => {
+    const sec = document.querySelector(`.settings-section[data-section="${name}"]`);
+    if (sec) sec.classList.toggle("open", !!settingsState.open[name]);
+  });
+  renderSettingsProfiles();
+  renderSettingsVisits();
+  renderSettingsHabits();
+  renderSettingsGoals();
+  renderSettingsStandards();
+  renderSettingsQuestions();
+  renderSettingsApp();
+}
+
+// Profiles
+function renderSettingsProfiles() {
+  const container = document.getElementById("settings-profiles");
+  if (!container) return;
+  const profiles = config.profiles || {};
+  const roles = ["matthew", "marie"];
+  container.innerHTML = roles.map(role => {
+    const p = profiles[role] || {};
+    return `<div class="settings-profile-row" data-role="${role}">
+      <div class="settings-profile-role">${role.charAt(0).toUpperCase() + role.slice(1)}</div>
+      <input class="settings-profile-name" type="text" data-field="displayName" value="${escapeHtml(p.displayName || "")}" placeholder="Display name">
+      <input class="settings-input" type="color" data-field="color" value="${escapeHtml(p.color || "#000000")}" title="Color" style="width:42px;padding:4px;">
+    </div>`;
+  }).join("");
+  container.querySelectorAll(".settings-profile-row").forEach(row => {
+    const role = row.dataset.role;
+    row.querySelectorAll("input").forEach(inp => {
+      const commit = async () => {
+        const next = { ...(config.profiles || {}) };
+        next[role] = { ...(next[role] || {}), [inp.dataset.field]: inp.value };
+        const prev = config.profiles;
+        config.profiles = next;
+        applyNameLabels();
+        const ok = await patchConfigDoc("profiles", { [role]: next[role] });
+        if (!ok) {
+          config.profiles = prev;
+          applyNameLabels();
+          renderSettingsProfiles();
+        }
+      };
+      inp.addEventListener("change", commit);
+      inp.addEventListener("blur", commit);
+      inp.addEventListener("keydown", e => { if (e.key === "Enter") inp.blur(); });
+    });
+  });
+}
+
+// Visits
+function renderSettingsVisits() {
+  const container = document.getElementById("settings-visits");
+  if (!container) return;
+  const items = (config.visits && Array.isArray(config.visits.items)) ? config.visits.items : [];
+  if (!items.length) {
+    container.innerHTML = `<p class="settings-empty">No visits scheduled.</p>`;
+    return;
+  }
+  container.innerHTML = items.map((v, i) => `<div class="settings-card" data-i="${i}">
+    <div class="settings-card-main settings-visit">
+      <div class="settings-card-row">
+        <input class="settings-input flex-name" type="text" data-field="name" value="${escapeHtml(v.name || "")}" placeholder="Visit name">
+      </div>
+      <div class="settings-card-row">
+        <label class="settings-label" style="margin-bottom:0">Start</label>
+        <input class="settings-input" type="date" data-field="start" value="${escapeHtml(v.start || "")}">
+        <label class="settings-label" style="margin-bottom:0">End</label>
+        <input class="settings-input" type="date" data-field="end" value="${escapeHtml(v.end || "")}">
+      </div>
+    </div>
+    <button class="settings-delete" data-del="${i}" aria-label="Delete visit">×</button>
+  </div>`).join("");
+
+  container.querySelectorAll(".settings-card").forEach(card => {
+    const i = parseInt(card.dataset.i, 10);
+    card.querySelectorAll("input[data-field]").forEach(inp => {
+      const commit = async () => {
+        const cur = (config.visits && config.visits.items) ? config.visits.items.slice() : [];
+        if (!cur[i]) return;
+        const updated = { ...cur[i], [inp.dataset.field]: inp.value };
+        cur[i] = updated;
+        const prev = config.visits;
+        config.visits = { items: cur };
+        renderHeader();
+        const ok = await saveConfigDoc("visits", { items: cur });
+        if (!ok) {
+          config.visits = prev;
+          renderHeader();
+          renderSettingsVisits();
+        }
+      };
+      inp.addEventListener("change", commit);
+      inp.addEventListener("blur", commit);
+      inp.addEventListener("keydown", e => { if (e.key === "Enter") inp.blur(); });
+    });
+    const delBtn = card.querySelector(".settings-delete");
+    if (delBtn) delBtn.addEventListener("click", async () => {
+      if (!confirm("Delete this visit?")) return;
+      const cur = (config.visits && config.visits.items) ? config.visits.items.slice() : [];
+      cur.splice(i, 1);
+      const prev = config.visits;
+      config.visits = { items: cur };
+      renderSettingsVisits();
+      renderHeader();
+      const ok = await saveConfigDoc("visits", { items: cur });
+      if (!ok) {
+        config.visits = prev;
+        renderSettingsVisits();
+        renderHeader();
+      }
+    });
+  });
+}
+
+async function addVisit() {
+  const cur = (config.visits && config.visits.items) ? config.visits.items.slice() : [];
+  const t = todayISO();
+  cur.push({ id: uid("v"), name: "New visit", start: t, end: t });
+  const prev = config.visits;
+  config.visits = { items: cur };
+  renderSettingsVisits();
+  renderHeader();
+  const ok = await saveConfigDoc("visits", { items: cur });
+  if (!ok) {
+    config.visits = prev;
+    renderSettingsVisits();
+    renderHeader();
+  }
+}
+
+// Habits
+function renderSettingsHabits() {
+  const tabsEl = document.querySelector('.settings-tabs[data-group="habits"]');
+  if (tabsEl) {
+    tabsEl.querySelectorAll(".settings-tab").forEach(b => {
+      b.classList.toggle("active", b.dataset.habitsTab === settingsState.habitsTab);
+    });
+  }
+  const container = document.getElementById("settings-habits");
+  if (!container) return;
+  const list = (config.habits && config.habits[settingsState.habitsTab]) || [];
+  if (!list.length) {
+    container.innerHTML = `<p class="settings-empty">No habits yet. Tap "+ Add habit" below.</p>`;
+    return;
+  }
+  container.innerHTML = list.map((h, i) => `<div class="settings-card" data-i="${i}">
+    <div class="settings-card-main">
+      <div class="settings-card-row">
+        <input class="settings-input emoji" type="text" maxlength="6" data-field="emoji" value="${escapeHtml(h.emoji || "")}">
+        <input class="settings-input flex-name" type="text" data-field="name" value="${escapeHtml(h.name || "")}" placeholder="Habit name">
+      </div>
+      <div class="settings-card-row">
+        <input class="settings-input flex-target" type="text" data-field="target" value="${escapeHtml(h.target || "")}" placeholder="Daily / 3x/week">
+        <select class="settings-select" data-field="section">
+          <option value="body" ${sectionFor(h.id) === "body" ? "selected" : ""}>Body</option>
+          <option value="mind" ${sectionFor(h.id) === "mind" ? "selected" : ""}>Mind &amp; Spirit</option>
+          <option value="together" ${sectionFor(h.id) === "together" ? "selected" : ""}>Together</option>
+        </select>
+      </div>
+    </div>
+    <button class="settings-delete" data-del="${i}" aria-label="Delete habit">×</button>
+  </div>`).join("");
+
+  container.querySelectorAll(".settings-card").forEach(card => {
+    const i = parseInt(card.dataset.i, 10);
+    card.querySelectorAll("input[data-field], select[data-field]").forEach(inp => {
+      const commit = async () => {
+        const role = settingsState.habitsTab;
+        const cur = (config.habits && config.habits[role]) ? config.habits[role].slice() : [];
+        if (!cur[i]) return;
+        const field = inp.dataset.field;
+        const prevHabits = config.habits;
+        const prevSections = config.habit_sections;
+        if (field === "section") {
+          // Move habit id between section.ids
+          const sections = JSON.parse(JSON.stringify(config.habit_sections || DEFAULT_HABIT_SECTIONS));
+          ["body","mind","together"].forEach(k => {
+            sections[k] = sections[k] || { title: k, ids: [] };
+            sections[k].ids = (sections[k].ids || []).filter(id => id !== cur[i].id);
+          });
+          sections[inp.value] = sections[inp.value] || { title: inp.value, ids: [] };
+          sections[inp.value].ids.push(cur[i].id);
+          config.habit_sections = sections;
+          const ok = await saveConfigDoc("habit_sections", sections);
+          if (!ok) {
+            config.habit_sections = prevSections;
+            renderSettingsHabits();
+          } else {
+            renderToday();
+          }
+          return;
+        }
+        const updated = { ...cur[i], [field]: inp.value };
+        cur[i] = updated;
+        const nextHabits = { ...(config.habits || {}), [role]: cur };
+        config.habits = nextHabits;
+        const ok = await saveConfigDoc("habits", nextHabits);
+        if (!ok) {
+          config.habits = prevHabits;
+          renderSettingsHabits();
+        }
+      };
+      inp.addEventListener("change", commit);
+      inp.addEventListener("blur", commit);
+      inp.addEventListener("keydown", e => { if (e.key === "Enter" && inp.tagName === "INPUT") inp.blur(); });
+    });
+    const delBtn = card.querySelector(".settings-delete");
+    if (delBtn) delBtn.addEventListener("click", async () => {
+      const role = settingsState.habitsTab;
+      const cur = (config.habits && config.habits[role]) ? config.habits[role].slice() : [];
+      const removed = cur[i];
+      if (!removed) return;
+      if (!confirm(`Delete habit "${removed.name || ""}"?`)) return;
+      cur.splice(i, 1);
+      const prevHabits = config.habits;
+      const prevSections = config.habit_sections;
+      const nextHabits = { ...(config.habits || {}), [role]: cur };
+      // Also strip the id from habit_sections
+      const sections = JSON.parse(JSON.stringify(config.habit_sections || DEFAULT_HABIT_SECTIONS));
+      ["body","mind","together"].forEach(k => {
+        sections[k] = sections[k] || { title: k, ids: [] };
+        sections[k].ids = (sections[k].ids || []).filter(id => id !== removed.id);
+      });
+      config.habits = nextHabits;
+      config.habit_sections = sections;
+      renderSettingsHabits();
+      const ok1 = await saveConfigDoc("habits", nextHabits);
+      const ok2 = await saveConfigDoc("habit_sections", sections);
+      if (!ok1 || !ok2) {
+        config.habits = prevHabits;
+        config.habit_sections = prevSections;
+        renderSettingsHabits();
+      }
+    });
+  });
+}
+
+async function addHabit() {
+  const role = settingsState.habitsTab;
+  const cur = (config.habits && config.habits[role]) ? config.habits[role].slice() : [];
+  const prefix = role === "matthew" ? "mw" : role === "marie" ? "mr" : "sh";
+  const id = uid(prefix);
+  cur.push({ id, name: "New habit", emoji: "✨", target: "Daily" });
+  const sections = JSON.parse(JSON.stringify(config.habit_sections || DEFAULT_HABIT_SECTIONS));
+  sections.body = sections.body || { title: "Body", ids: [] };
+  sections.body.ids.push(id);
+  const prevHabits = config.habits;
+  const prevSections = config.habit_sections;
+  const nextHabits = { ...(config.habits || {}), [role]: cur };
+  config.habits = nextHabits;
+  config.habit_sections = sections;
+  renderSettingsHabits();
+  const ok1 = await saveConfigDoc("habits", nextHabits);
+  const ok2 = await saveConfigDoc("habit_sections", sections);
+  if (!ok1 || !ok2) {
+    config.habits = prevHabits;
+    config.habit_sections = prevSections;
+    renderSettingsHabits();
+  }
+}
+
+// Goals
+function renderSettingsGoals() {
+  const tabsEl = document.querySelector('.settings-tabs[data-group="goals"]');
+  if (tabsEl) {
+    tabsEl.querySelectorAll(".settings-tab").forEach(b => {
+      b.classList.toggle("active", b.dataset.goalsTab === settingsState.goalsTab);
+    });
+  }
+  const container = document.getElementById("settings-goals");
+  if (!container) return;
+  const list = (config.outcomes && config.outcomes[settingsState.goalsTab]) || [];
+  if (!list.length) {
+    container.innerHTML = `<p class="settings-empty">No goals yet. Tap "+ Add goal" below.</p>`;
+    return;
+  }
+  container.innerHTML = list.map((o, i) => `<div class="settings-card" data-i="${i}">
+    <div class="settings-card-main">
+      <div class="settings-card-row">
+        <input class="settings-input flex-name" type="text" data-field="name" value="${escapeHtml(o.name || "")}" placeholder="Goal">
+      </div>
+      <div class="settings-card-row">
+        <input class="settings-input flex-target" type="text" data-field="target" value="${escapeHtml(o.target || "")}" placeholder="Target / due">
+        <input class="settings-input" type="text" data-field="cat" value="${escapeHtml(o.cat || "")}" placeholder="category" style="width:120px;">
+        <label class="settings-check"><input type="checkbox" data-field="focus" ${o.focus ? "checked" : ""}> Focus</label>
+      </div>
+    </div>
+    <button class="settings-delete" data-del="${i}" aria-label="Delete goal">×</button>
+  </div>`).join("");
+
+  container.querySelectorAll(".settings-card").forEach(card => {
+    const i = parseInt(card.dataset.i, 10);
+    card.querySelectorAll("input[data-field]").forEach(inp => {
+      const commit = async () => {
+        const role = settingsState.goalsTab;
+        const cur = (config.outcomes && config.outcomes[role]) ? config.outcomes[role].slice() : [];
+        if (!cur[i]) return;
+        const field = inp.dataset.field;
+        const value = inp.type === "checkbox" ? inp.checked : inp.value;
+        cur[i] = { ...cur[i], [field]: value };
+        const prev = config.outcomes;
+        const next = { ...(config.outcomes || {}), [role]: cur };
+        config.outcomes = next;
+        const ok = await saveConfigDoc("outcomes", next);
+        if (!ok) {
+          config.outcomes = prev;
+          renderSettingsGoals();
+        } else {
+          renderToday();
+        }
+      };
+      inp.addEventListener("change", commit);
+      inp.addEventListener("blur", commit);
+      inp.addEventListener("keydown", e => { if (e.key === "Enter" && inp.type !== "checkbox") inp.blur(); });
+    });
+    const delBtn = card.querySelector(".settings-delete");
+    if (delBtn) delBtn.addEventListener("click", async () => {
+      const role = settingsState.goalsTab;
+      const cur = (config.outcomes && config.outcomes[role]) ? config.outcomes[role].slice() : [];
+      if (!cur[i]) return;
+      if (!confirm(`Delete goal "${cur[i].name || ""}"?`)) return;
+      cur.splice(i, 1);
+      const prev = config.outcomes;
+      const next = { ...(config.outcomes || {}), [role]: cur };
+      config.outcomes = next;
+      renderSettingsGoals();
+      const ok = await saveConfigDoc("outcomes", next);
+      if (!ok) {
+        config.outcomes = prev;
+        renderSettingsGoals();
+      }
+    });
+  });
+}
+
+async function addGoal() {
+  const role = settingsState.goalsTab;
+  const cur = (config.outcomes && config.outcomes[role]) ? config.outcomes[role].slice() : [];
+  const prefix = role === "matthew" ? "mw" : role === "marie" ? "mr" : "sh";
+  cur.push({ id: uid(prefix), cat: "personal", name: "New goal", target: "TBD", focus: false });
+  const prev = config.outcomes;
+  const next = { ...(config.outcomes || {}), [role]: cur };
+  config.outcomes = next;
+  renderSettingsGoals();
+  const ok = await saveConfigDoc("outcomes", next);
+  if (!ok) {
+    config.outcomes = prev;
+    renderSettingsGoals();
+  }
+}
+
+// Standards
+function renderSettingsStandards() {
+  const tabsEl = document.querySelector('.settings-tabs[data-group="standards"]');
+  if (tabsEl) {
+    tabsEl.querySelectorAll(".settings-tab").forEach(b => {
+      b.classList.toggle("active", b.dataset.standardsTab === settingsState.standardsTab);
+    });
+  }
+  const container = document.getElementById("settings-standards");
+  if (!container) return;
+  const list = (config.standards && config.standards[settingsState.standardsTab]) || [];
+  if (!list.length) {
+    container.innerHTML = `<p class="settings-empty">No standards yet. Tap "+ Add standard" below.</p>`;
+    return;
+  }
+  container.innerHTML = list.map((s, i) => `<div class="settings-card" data-i="${i}">
+    <div class="settings-card-main">
+      <div class="settings-card-row">
+        <input class="settings-input flex-name" type="text" data-field="name" value="${escapeHtml(s.name || "")}" placeholder="Standard">
+      </div>
+      <div class="settings-card-row">
+        <input class="settings-input flex-ctx" type="text" data-field="ctx" value="${escapeHtml(s.ctx || "")}" placeholder="Context (optional)">
+      </div>
+    </div>
+    <button class="settings-delete" data-del="${i}" aria-label="Delete standard">×</button>
+  </div>`).join("");
+
+  container.querySelectorAll(".settings-card").forEach(card => {
+    const i = parseInt(card.dataset.i, 10);
+    card.querySelectorAll("input[data-field]").forEach(inp => {
+      const commit = async () => {
+        const role = settingsState.standardsTab;
+        const cur = (config.standards && config.standards[role]) ? config.standards[role].slice() : [];
+        if (!cur[i]) return;
+        cur[i] = { ...cur[i], [inp.dataset.field]: inp.value };
+        const prev = config.standards;
+        const next = { ...(config.standards || {}), [role]: cur };
+        config.standards = next;
+        const ok = await saveConfigDoc("standards", next);
+        if (!ok) {
+          config.standards = prev;
+          renderSettingsStandards();
+        }
+      };
+      inp.addEventListener("change", commit);
+      inp.addEventListener("blur", commit);
+      inp.addEventListener("keydown", e => { if (e.key === "Enter") inp.blur(); });
+    });
+    const delBtn = card.querySelector(".settings-delete");
+    if (delBtn) delBtn.addEventListener("click", async () => {
+      const role = settingsState.standardsTab;
+      const cur = (config.standards && config.standards[role]) ? config.standards[role].slice() : [];
+      if (!cur[i]) return;
+      if (!confirm(`Delete standard "${cur[i].name || ""}"?`)) return;
+      cur.splice(i, 1);
+      const prev = config.standards;
+      const next = { ...(config.standards || {}), [role]: cur };
+      config.standards = next;
+      renderSettingsStandards();
+      const ok = await saveConfigDoc("standards", next);
+      if (!ok) {
+        config.standards = prev;
+        renderSettingsStandards();
+      }
+    });
+  });
+}
+
+async function addStandard() {
+  const role = settingsState.standardsTab;
+  const cur = (config.standards && config.standards[role]) ? config.standards[role].slice() : [];
+  const prefix = role === "marie" ? "s-mr" : "s-mw";
+  cur.push({ id: uid(prefix), name: "New standard", ctx: "" });
+  const prev = config.standards;
+  const next = { ...(config.standards || {}), [role]: cur };
+  config.standards = next;
+  renderSettingsStandards();
+  const ok = await saveConfigDoc("standards", next);
+  if (!ok) {
+    config.standards = prev;
+    renderSettingsStandards();
+  }
+}
+
+// Questions
+function renderSettingsQuestions() {
+  const container = document.getElementById("settings-questions");
+  if (!container) return;
+  const items = (config.questions && Array.isArray(config.questions.items)) ? config.questions.items : [];
+  if (!items.length) {
+    container.innerHTML = `<p class="settings-empty">No questions yet.</p>`;
+    return;
+  }
+  container.innerHTML = items.map((q, i) => `<div class="settings-question-row" data-i="${i}">
+    <input class="settings-input" type="text" value="${escapeHtml(q || "")}" placeholder="Question">
+    <button class="settings-delete" data-del="${i}" aria-label="Delete question">×</button>
+  </div>`).join("");
+
+  container.querySelectorAll(".settings-question-row").forEach(row => {
+    const i = parseInt(row.dataset.i, 10);
+    const inp = row.querySelector("input");
+    const commit = async () => {
+      const cur = (config.questions && config.questions.items) ? config.questions.items.slice() : [];
+      cur[i] = inp.value;
+      const prev = config.questions;
+      config.questions = { items: cur };
+      const ok = await saveConfigDoc("questions", { items: cur });
+      if (!ok) {
+        config.questions = prev;
+        renderSettingsQuestions();
+      }
+    };
+    inp.addEventListener("change", commit);
+    inp.addEventListener("blur", commit);
+    inp.addEventListener("keydown", e => { if (e.key === "Enter") inp.blur(); });
+    const delBtn = row.querySelector(".settings-delete");
+    if (delBtn) delBtn.addEventListener("click", async () => {
+      if (!confirm("Delete this question?")) return;
+      const cur = (config.questions && config.questions.items) ? config.questions.items.slice() : [];
+      cur.splice(i, 1);
+      const prev = config.questions;
+      config.questions = { items: cur };
+      renderSettingsQuestions();
+      const ok = await saveConfigDoc("questions", { items: cur });
+      if (!ok) {
+        config.questions = prev;
+        renderSettingsQuestions();
+      }
+    });
+  });
+}
+
+async function addQuestion() {
+  const cur = (config.questions && config.questions.items) ? config.questions.items.slice() : [];
+  cur.push("New question?");
+  const prev = config.questions;
+  config.questions = { items: cur };
+  renderSettingsQuestions();
+  const ok = await saveConfigDoc("questions", { items: cur });
+  if (!ok) {
+    config.questions = prev;
+    renderSettingsQuestions();
+  }
+}
+
+// App
+function renderSettingsApp() {
+  const container = document.getElementById("settings-app");
+  if (!container) return;
+  const app = config.app || { startDate: DEFAULT_START_DATE, schemaVersion: 1 };
+  container.innerHTML = `<div class="settings-app-row">
+    <span class="settings-label">Start date</span>
+    <input class="settings-input" id="settings-startdate" type="date" value="${escapeHtml(app.startDate || DEFAULT_START_DATE)}">
+  </div>
+  <div class="settings-app-row">
+    <span class="settings-label">Schema version</span>
+    <span class="ro">${escapeHtml(String(app.schemaVersion || 1))}</span>
+  </div>`;
+
+  const sd = document.getElementById("settings-startdate");
+  if (sd) {
+    const commit = async () => {
+      const next = { ...(config.app || {}), startDate: sd.value, schemaVersion: app.schemaVersion || 1 };
+      const prev = config.app;
+      config.app = next;
+      renderHeader();
+      const ok = await saveConfigDoc("app", next);
+      if (!ok) {
+        config.app = prev;
+        renderSettingsApp();
+        renderHeader();
+      }
+    };
+    sd.addEventListener("change", commit);
+    sd.addEventListener("blur", commit);
+  }
+}
+
+async function resetDefaults() {
+  if (!confirm("Reset all habits, goals, standards, and check-in questions to the built-in defaults? This cannot be undone.")) return;
+  try {
+    setSyncStatus("syncing");
+    const batch = writeBatch(db);
+    batch.set(doc(db, "config", "habits"),         DEFAULT_HABITS);
+    batch.set(doc(db, "config", "habit_sections"), DEFAULT_HABIT_SECTIONS);
+    batch.set(doc(db, "config", "outcomes"),       DEFAULT_OUTCOMES);
+    batch.set(doc(db, "config", "standards"),      DEFAULT_STANDARDS);
+    batch.set(doc(db, "config", "questions"),      DEFAULT_QUESTIONS);
+    await batch.commit();
+    setSyncStatus("synced");
+    showToast("Defaults restored.");
+  } catch (e) {
+    console.error("Reset failed:", e);
+    setSyncStatus("offline");
+    showToast("Reset failed.", "error");
+  }
+}
+
 // ---- App bootstrap -------------------------------------------------------
 
 ready(() => {
   console.log("M&M app initializing");
 
-  // Bootstrap order matters: sign in anonymously FIRST, then subscribe to Firestore
-  // (rules require request.auth != null on every read/write).
+  // Bootstrap order matters: sign in anonymously FIRST, then seed config (if
+  // needed), then subscribe to config + Firestore (rules require auth on every
+  // read/write).
   let _bootstrapped = false;
-  onAuthStateChanged(auth, (user) => {
+  onAuthStateChanged(auth, async (user) => {
     currentUid = user ? user.uid : null;
     if (user && !_bootstrapped) {
       _bootstrapped = true;
+      try { await seedConfigIfMissing(); } catch (e) { console.error("Seed err:", e); }
+      subscribeConfig();
       subscribeToData();
       if (currentUser) showApp();
       else showLogin();
@@ -939,9 +1709,11 @@ ready(() => {
 
   const saveBtn = document.getElementById("save-checkin");
   if (saveBtn) saveBtn.addEventListener("click", () => {
+    const qs = (config.questions && config.questions.items) || [];
+    const q = qs.length ? qs[state.qIndex % qs.length] : "";
     const entry = {
       date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-      q: QUESTIONS[state.qIndex % QUESTIONS.length],
+      q: q,
       ...state.currentCheckin
     };
     state.checkinArchive.push(entry);
@@ -1010,7 +1782,60 @@ ready(() => {
     if (caption && !caption.classList.contains("hidden") && e.key === "Escape") {
       closeCaptionModal();
     }
+    const settings = document.getElementById("settings-overlay");
+    if (settings && !settings.classList.contains("hidden") && e.key === "Escape") {
+      closeSettings();
+    }
   });
+
+  // --- Settings wiring ---
+  const openSetBtn = document.getElementById("open-settings");
+  if (openSetBtn) openSetBtn.addEventListener("click", openSettings);
+  const closeSetBtn = document.getElementById("settings-close");
+  if (closeSetBtn) closeSetBtn.addEventListener("click", closeSettings);
+
+  document.querySelectorAll(".settings-section-header[data-toggle]").forEach(h => {
+    h.addEventListener("click", () => {
+      const name = h.dataset.toggle;
+      settingsState.open[name] = !settingsState.open[name];
+      renderSettings();
+    });
+  });
+
+  // Tabs inside settings
+  document.querySelectorAll('.settings-tabs[data-group="habits"] .settings-tab').forEach(b => {
+    b.addEventListener("click", () => {
+      settingsState.habitsTab = b.dataset.habitsTab;
+      renderSettingsHabits();
+    });
+  });
+  document.querySelectorAll('.settings-tabs[data-group="goals"] .settings-tab').forEach(b => {
+    b.addEventListener("click", () => {
+      settingsState.goalsTab = b.dataset.goalsTab;
+      renderSettingsGoals();
+    });
+  });
+  document.querySelectorAll('.settings-tabs[data-group="standards"] .settings-tab').forEach(b => {
+    b.addEventListener("click", () => {
+      settingsState.standardsTab = b.dataset.standardsTab;
+      renderSettingsStandards();
+    });
+  });
+
+  // Add-buttons
+  document.querySelectorAll(".settings-add-btn[data-add]").forEach(b => {
+    b.addEventListener("click", () => {
+      const kind = b.dataset.add;
+      if (kind === "visit") addVisit();
+      else if (kind === "habit") addHabit();
+      else if (kind === "goal") addGoal();
+      else if (kind === "standard") addStandard();
+      else if (kind === "question") addQuestion();
+    });
+  });
+
+  const resetBtn = document.getElementById("settings-reset-defaults");
+  if (resetBtn) resetBtn.addEventListener("click", resetDefaults);
 
   // Note: showApp()/showLogin() and subscribeToData() are now called from the
   // onAuthStateChanged bootstrap above, after anonymous sign-in resolves.
