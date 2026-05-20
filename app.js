@@ -873,14 +873,25 @@ function attachViewerSwipe() {
 ready(() => {
   console.log("M&M app initializing");
 
-  // Track auth state so currentUid is always fresh
+  // Bootstrap order matters: sign in anonymously FIRST, then subscribe to Firestore
+  // (rules require request.auth != null on every read/write).
+  let _bootstrapped = false;
   onAuthStateChanged(auth, (user) => {
     currentUid = user ? user.uid : null;
+    if (user && !_bootstrapped) {
+      _bootstrapped = true;
+      subscribeToData();
+      if (currentUser) showApp();
+      else showLogin();
+    }
     if (user && currentUser) {
       bindRoleToUid();
       subscribeToPhotos();
     }
   });
+
+  // Kick off anonymous sign-in immediately; everything else waits for it.
+  signInAnonymously(auth).catch(e => console.error("Anonymous auth failed:", e));
 
   document.querySelectorAll(".who-btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -1000,8 +1011,6 @@ ready(() => {
     }
   });
 
-  if (currentUser) showApp();
-  else showLogin();
-
-  subscribeToData();
+  // Note: showApp()/showLogin() and subscribeToData() are now called from the
+  // onAuthStateChanged bootstrap above, after anonymous sign-in resolves.
 });
